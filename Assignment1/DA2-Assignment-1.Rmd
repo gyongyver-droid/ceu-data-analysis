@@ -1,0 +1,46 @@
+---
+title: "DA2-Assignment-1"
+author: "Gyongyver Kamenar (2103380)"
+date: "11/20/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, include = FALSE, warning = FALSE)
+```
+
+```{r Libraries}
+
+# Loading packages 
+if (!require("pacman")) {
+  install.packages("pacman")
+}
+library(pacman)
+pacman::p_load(tidyverse, ggplot2, modelsummary,
+               kableExtra, stargazer, knitr)
+```
+
+```{r Data}
+
+dt<-read.csv('morg-2014-emp.csv', header=TRUE)
+View(dt)
+
+```
+### Introduction
+
+The chosen occupations:
+
+1006 Computer systems analysts
+1007 Information security analysts
+1010 Computer programmers
+1020 Software developers, applications and systems software
+1030 Web developers
+
+### Descriptive statistics
+
+### Modelling
+
+### Summary
+
+
+### Appendix
