@@ -6,10 +6,10 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, include = FALSE, warning = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
 ```
 
-```{r Libraries}
+```{r Libraries, include=FALSE}
 
 # Loading packages 
 if (!require("pacman")) {
@@ -17,15 +17,88 @@ if (!require("pacman")) {
 }
 library(pacman)
 pacman::p_load(tidyverse, ggplot2, modelsummary,
-               kableExtra, stargazer, knitr)
+               kableExtra, stargazer, knitr, fixest, corrplot)
 ```
 
-```{r Data}
+```{r Data, include=FALSE}
 
 dt<-read.csv('morg-2014-emp.csv', header=TRUE)
-View(dt)
+
+summary(dt)
+
+#  Variables
+#  X |
+# hhid| Household id
+# intmonth| Interview month
+# stfips| State codes
+# weight| Final Weight x 100
+# earnwke| weakly earnings
+# uhours| usual working hours per week
+# grade92| highest educational grade completed (31-46)
+# race| race
+# ethnic| ethnic
+# age| age
+# sex| sex male=1 female=2
+# marital| 
+  #marital status Married civilian spouse present 1
+  # Married AF spouse present 2 
+  # Married spouse absent or separated 3
+  # Widowed or divorced(Through 88) 4
+  # Widowed (After 88) 4
+  # Divorced “ 5
+  # Separated “ 6
+  # Never Married 7
+
+# ownchild| Number of own children
+# chldpres| Presence of own children less than 18 in primary family
+  #  Recodes of presence of own child variable. "1" indicates presence of one or more children in that age range, "0" indicates absence of children in the age ranges 0-2, 0-5, 3-5, 6-13, and 14-17 respectively. 
+
+# prcitshp| Citizenship status
+# state| Census Code for state
+# ind02| Industry Classification Code
+# occ2012| occupational code (census 2010 classification)
+# class| class of worker
+# unionmme| is...a member of a labor union or an employee association similar to a union?
+# unioncov|  is...covered by a union or employee association contract?
+# lfsr94| Employment Status Recode Last week.
+
+
 
 ```
+
+```{r Data manipulation, include=FALSE}
+# Filter datatable for the given occupations
+data <- filter(dt, dt$occ2012 %in% c(1006,1007,1010,1020,1030) )
+
+
+## Create hourly wage variable
+  # earnwke is weekly earnings and uhours is usualy working hours per week
+  # So is we want to compare people we have to create a better measure
+  # earnhrs = earnwke/uhours
+  # ln_earnhrs = log(earnwke/uhours)
+
+## Re-factor male and female : male:0 and female:1 
+  # For easier interpretation
+
+## Factorise categorical variables inticated by integers
+
+data <- data %>% mutate(
+  earnhrs = earnwke/uhours,
+  ln_earnhrs = log(earnwke/uhours), 
+  sex= sex - 1,
+  grade92 = as.factor(grade92),
+  race = as.factor(race),
+  ethnic = as.factor(ethnic),
+  marital = as.factor(marital),
+  chldpres = as.factor(chldpres),
+  occ2012 = as.factor(occ2012)
+)
+
+#
+data
+
+```
+
 ### Introduction
 
 The chosen occupations:
@@ -44,3 +117,49 @@ The chosen occupations:
 
 
 ### Appendix
+
+```{r Descriptive Statistics, echo=FALSE}
+
+#descriptive statistics table 
+datasummary( earnwke + weight +uhours + grade92+ age + ownchild +chldpres ~  N + Percent() + Mean +SD + Min + Max +Median + P25 +P75, data = dt,
+            output = 'latex',
+            title = 'Descriptive Statistics',
+            notes = '')  
+
+
+```
+
+```{r Models, echo=FALSE, warning=FALSE}
+
+reg1<-feols(ln_earnhrs ~ sex, data = data, vcov = 'hetero')
+
+reg2<-feols(ln_earnhrs ~ sex + age , data = data, vcov = 'hetero')
+
+
+reg3<-feols(ln_earnhrs ~ sex + age + grade92 , data = data, vcov = 'hetero')
+
+
+reg4<-feols(ln_earnhrs ~ sex + age + grade92 + sex*grade92 , data = data, vcov = 'hetero')
+
+
+reg5<-feols(ln_earnhrs ~ sex + age + grade92 + ownchild, data = data, vcov = 'hetero')
+
+
+regtable<-etable(reg1,reg2,reg3,reg4,reg5, tex = FALSE)
+#regtable
+
+kable(regtable, "latex") %>% column_spec(1:6,width = "6em")
+
+```
+
+```{r Plots, echo=FALSE}
+
+## Correlation matrix
+corr_table<-data[,c(8,11,12,14,25)]
+corr_table$grade92<-as.numeric(corr_table$grade92)
+c1<-cor(corr_table)
+corrplot(c1,type = "lower", addCoef.col = 'black', title = "Correlation matrix",tl.col = "black", tl.cex = 0.9 )
+
+
+```
+
