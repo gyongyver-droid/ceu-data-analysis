@@ -117,19 +117,25 @@ The chosen occupations:
 
 
 ### Appendix
-
+### Descriptive statistics
 ```{r Descriptive Statistics, echo=FALSE}
 
 #descriptive statistics table 
-datasummary( earnwke + weight +uhours + grade92+ age + ownchild +chldpres ~  N + Percent() + Mean +SD + Min + Max +Median + P25 +P75, data = dt,
+datasummary( earnwke+ earnhrs+ ln_earnhrs + weight +uhours +as.numeric(grade92)+ age + ownchild +as.numeric(chldpres) ~  N + Percent() + Mean +SD + Min + Max +Median + P25 +P75, data = data,
             output = 'latex',
             title = 'Descriptive Statistics',
             notes = '')  
 
-
 ```
 
-```{r Models, echo=FALSE, warning=FALSE}
+### check
+
+```{r Descriptives 2, echo=FALSE}
+kable(data %>% group_by(sex) %>% count() )
+kable(data %>% group_by(grade92) %>% count())
+```
+
+```{r Models, echo=FALSE, message=FALSE, warning=FALSE}
 
 reg1<-feols(ln_earnhrs ~ sex, data = data, vcov = 'hetero')
 
@@ -142,23 +148,93 @@ reg3<-feols(ln_earnhrs ~ sex + age + grade92 , data = data, vcov = 'hetero')
 reg4<-feols(ln_earnhrs ~ sex + age + grade92 + sex*grade92 , data = data, vcov = 'hetero')
 
 
-reg5<-feols(ln_earnhrs ~ sex + age + grade92 + ownchild, data = data, vcov = 'hetero')
+reg5<-feols(ln_earnhrs ~ sex + age +poly(age,2) + grade92 + ownchild, data = data, vcov = 'hetero')
 
 
 regtable<-etable(reg1,reg2,reg3,reg4,reg5, tex = FALSE)
 #regtable
 
-kable(regtable, "latex") %>% column_spec(1:6,width = "6em")
+kable(regtable, "latex") %>% column_spec(1:6,width = "6em") %>%  
+  kable_styling(bootstrap_options = "bordered", full_width = FALSE) %>% 
+   row_spec(row = 0,
+  bold = TRUE) %>%
+  column_spec(column = 1, width = "6em", bold = TRUE,
+  border_left = TRUE) %>%
+  column_spec(column = 6, width = "6em",
+  border_right = TRUE) 
 
 ```
-
+### Correlation matrix
 ```{r Plots, echo=FALSE}
 
 ## Correlation matrix
 corr_table<-data[,c(8,11,12,14,25)]
 corr_table$grade92<-as.numeric(corr_table$grade92)
 c1<-cor(corr_table)
-corrplot(c1,type = "lower", addCoef.col = 'black', title = "Correlation matrix",tl.col = "black", tl.cex = 0.9 )
+corrplot(c1,type = "upper", addCoef.col = 'black',tl.col = "black", tl.cex = 0.9 )
+
+
+```
+```{r My theme, message=FALSE, warning=FALSE, include=FALSE}
+
+theme_gyongyver<-function(base_size=12){
+  # Use the basic properties of theme_bw
+  theme_light() %+replace% 
+    
+    # Change the items
+    theme(
+      # The grids on the background
+      panel.grid.major  = element_line(color = "slategray2"),
+      panel.grid.minor = element_line(color="grey90"),
+      # The background color
+      panel.background  = element_rect(fill = "grey95"),
+      # the axis line
+      axis.line         = element_line(color = "navyblue"),
+      # Littel lines called ticks on the axis
+      axis.ticks        = element_line(color = "navy"),
+      # Numbers on the axis
+      axis.text         = element_text(color = "navy"),
+      # NEW ONES
+      # rectangle element
+      rect = element_rect(fill="grey10",colour = "white"),
+      # axis title
+      axis.title = element_text(colour="mediumblue"),
+      # plot background
+      plot.background = element_rect(fill="white"),
+      # title
+      plot.title = element_text(family = "", colour="midnightblue", size=14, hjust = 0.5, vjust=0.8),
+      plot.subtitle = element_text(family = "", colour="midnightblue", size=12, hjust = 0.5),
+      #caption
+      plot.caption = element_text(size = 9, colour = "steelblue3", hjust = 1),
+      #legend
+      legend.background = element_rect(fill = "grey80", colour = "grey80"),
+      legend.text = element_text(colour = "black"),
+      panel.border = element_blank()
+      
+    )
+  
+}
+
+```
+
+
+```{r Plot 2, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Age and earnhrs per gender
+dt_mean<- data %>%  group_by(sex, age) %>% summarise_at(vars(ln_earnhrs), list(name=mean))
+
+
+ggplot(dt_mean)+
+  geom_smooth(aes(x=age, y=name, color=as.factor(sex)), method = 'loess')+
+  labs(
+    title = "Average earning per hour conditional on age by sex",
+    y= "Mean earning per hour",
+    x= "Age",
+    color="Sex",
+    caption = "Gyongyver Kamenar",
+    
+  )+
+  theme_gyongyver()
 
 
 ```
