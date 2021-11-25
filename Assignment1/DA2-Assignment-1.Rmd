@@ -1,7 +1,7 @@
 ---
 title: "DA2-Assignment-1"
 author: "Gyongyver Kamenar (2103380)"
-date: "11/20/2021"
+geometry: "left=2cm,right=2cm,top=1cm,bottom=2cm"
 output: pdf_document
 ---
 
@@ -13,11 +13,12 @@ knitr::opts_chunk$set(warning = FALSE)
 
 # Loading packages 
 if (!require("pacman")) {
-  install.packages("pacman")
+  install.packages("pacman","PerformanceAnalytics")
 }
 library(pacman)
 pacman::p_load(tidyverse, ggplot2, modelsummary,
-               kableExtra, stargazer, knitr, fixest, corrplot)
+               kableExtra, stargazer, knitr, fixest, corrplot, PerformanceAnalytics)
+
 ```
 
 ```{r Data, include=FALSE}
@@ -70,7 +71,7 @@ summary(dt)
 # Filter datatable for the given occupations
 data <- filter(dt, dt$occ2012 %in% c(1006,1007,1010,1020,1030) )
 
-
+data<-filter(data, grade92>37, earnwke>2)
 ## Create hourly wage variable
   # earnwke is weekly earnings and uhours is usualy working hours per week
   # So is we want to compare people we have to create a better measure
@@ -86,6 +87,7 @@ data <- data %>% mutate(
   earnhrs = earnwke/uhours,
   ln_earnhrs = log(earnwke/uhours), 
   sex= sex - 1,
+  age_square = age^2,
   grade92 = as.factor(grade92),
   race = as.factor(race),
   ethnic = as.factor(ethnic),
@@ -94,86 +96,106 @@ data <- data %>% mutate(
   occ2012 = as.factor(occ2012)
 )
 
-#
-data
+summary(data)
 
 ```
 
 ### Introduction
 
-The chosen occupations:
+I investigated the gender wage gap in 5 similar occupations: 1) computer system analyst, 2) information security analyst, 3) computer programmers 4) software developers, application and system software and 5) web developers. These occupations include 2642 people, from which 1948 are males and 694 females. I decided to take the logarith of wages because financial data is more comparable in percentages, so my dependent variable is the log(earnings per working hours) which I modeled with several explanatory variables. 
 
-1006 Computer systems analysts
-1007 Information security analysts
-1010 Computer programmers
-1020 Software developers, applications and systems software
-1030 Web developers
 
-### Descriptive statistics
+### Data cleaning and descriptive statistics
+
+I created the descriptive statistics table of the most relevant numerical variables. There are also categorical but ordinal variables so I calculated their descriptives too to spot any potential error or interesting feature.
+I found an error regarding the wage: a 43-years-old female earns 2$ for 40 hours of work, I think it is a measurement error so I excluded it from the data. I also excluded 3 people who have not finished the 12the grade of high school, they are 17 and 18 years olds any people usually do not work at that age. There are also another 3 people who do not have at least high school diploma but they are middle-aged, work full time and have proper earnings so I left them in my dataset.
 
 ### Modelling
 
+Firstly, I modeled the unconditional wage gap with a linear regression and heteroskedasticity-robust SE. The coefficient is -0.16 meaning that women earn 16% less on average. The coefficient is significant even at 0.1% level. We can say that it is statistically different from zero, the 95% CI is [-0.20; -0.12].
+In the second model I included the grade92 variables as factors to show who the wage varies with gender and education. The base value is the highest level (Doctorate degree) so every grade92 coefficients are negative because these are compared to the Phd. Only the 38 and 45 categories are not significant from the grade92 categories, I think because there are too few people in these two cases (3 and 14). Let me interpret the coefficient of grade92=39 (high school graduates), people whose highest education is high school graduation earn 51% less on average within the same sex.
+
+In the 3rd model I also added age because I think it must be a relevant factor in explaining earnings, the correlation between them is 0.26. As expected age is also significant at 0.1%. People aged 1 year more have 1.2% higher wage on average ceteris paribus. However, one can see on the 2nd graph that the relationship between age and wage is not linear, intuitively wages increase more at the beginning of the career but at a point it stops increasing and starts declining or stay constant.
+So in my 4th model I added age square as well. As we can see the age squared is also significant at 0.1% level and the R^2 increased a lot too. The sex coefficient is still significant in this model, but now females earn 18% less on average holding all the other variables constant.
+
+Another explanatory factor can be the number of children so I added the number of own children (ownchild) variable to the model. It coefficient is significant at 1% level, by interpreting we can sey that people with one more child earn 2.8% more ceteris paribus. 
+In the last model, I used the interaction between sex and education, to see that at different education elvels there is a difference between female and male wages. Actually none of the interaction terms happend to bee significant even at 10% level. In several educational categories there is not enough females to draw any statistical conclusion from it. 
+
+
 ### Summary
 
+Within five computer and mathematical occupations I found ~16% unconditional gender wage gap. After controlling for age, education level and the number of children I still found that there is a 18% difference on average between male and female wages. In both cases the coefficient si significant at 0.1% level so we can say, that there is a gender wage gap (different from zero) in the population represented by this sample.
 
 ### Appendix
-### Descriptive statistics
+
 ```{r Descriptive Statistics, echo=FALSE}
 
+
 #descriptive statistics table 
-datasummary( earnwke+ earnhrs+ ln_earnhrs + weight +uhours +as.numeric(grade92)+ age + ownchild +as.numeric(chldpres) ~  N + Percent() + Mean +SD + Min + Max +Median + P25 +P75, data = data,
+
+datasummary( earnwke+ earnhrs+ ln_earnhrs +uhours +as.numeric(grade92)+ age + ownchild +as.numeric(chldpres) ~  N + Percent() + Mean +SD + Min + Max +Median + P25 +P75, data = data,
             output = 'latex',
             title = 'Descriptive Statistics',
             notes = '')  
 
+
+
 ```
 
-### check
 
-```{r Descriptives 2, echo=FALSE}
-kable(data %>% group_by(sex) %>% count() )
-kable(data %>% group_by(grade92) %>% count())
+```{r Descriptives 2, include=FALSE}
+data %>% group_by(sex) %>% count() 
+data %>% group_by(grade92) %>% count()
+data %>% group_by(grade92, sex) %>% count()
 ```
 
 ```{r Models, echo=FALSE, message=FALSE, warning=FALSE}
 
 reg1<-feols(ln_earnhrs ~ sex, data = data, vcov = 'hetero')
 
-reg2<-feols(ln_earnhrs ~ sex + age , data = data, vcov = 'hetero')
+reg2<-feols(ln_earnhrs ~ sex + grade92 , data = data, vcov = 'hetero')
 
 
 reg3<-feols(ln_earnhrs ~ sex + age + grade92 , data = data, vcov = 'hetero')
 
 
-reg4<-feols(ln_earnhrs ~ sex + age + grade92 + sex*grade92 , data = data, vcov = 'hetero')
+reg4<-feols(ln_earnhrs ~ sex + age + age_square + grade92, data = data, vcov = 'hetero')
 
 
-reg5<-feols(ln_earnhrs ~ sex + age +poly(age,2) + grade92 + ownchild, data = data, vcov = 'hetero')
+reg5<-feols(ln_earnhrs ~ sex + age + age_square + grade92 + ownchild, data = data, vcov = 'hetero')
+#reg5
 
+reg6<-feols(ln_earnhrs ~ sex + grade92 + sex*grade92 , data = data, vcov = 'hetero')
 
-regtable<-etable(reg1,reg2,reg3,reg4,reg5, tex = FALSE)
+regtable<-etable(reg1,reg2,reg3,reg4,reg5,reg6, tex = FALSE)
 #regtable
 
-kable(regtable, "latex") %>% column_spec(1:6,width = "6em") %>%  
-  kable_styling(bootstrap_options = "bordered", full_width = FALSE) %>% 
-   row_spec(row = 0,
-  bold = TRUE) %>%
+kable(regtable, "latex") %>% column_spec(2:7,width = "5.5em") %>%  
+  kable_styling(bootstrap_options = "bordered", full_width = FALSE, repeat_header_text = "Regression table") %>% 
+   row_spec(row = 1, bold =TRUE ) %>%
   column_spec(column = 1, width = "6em", bold = TRUE,
   border_left = TRUE) %>%
-  column_spec(column = 6, width = "6em",
+  column_spec(column = 7, width = "6em",
   border_right = TRUE) 
 
 ```
-### Correlation matrix
+```{r include=FALSE}
+confint(reg1, level=0.95)
+```
+
+
+
+### Correlation plot
 ```{r Plots, echo=FALSE}
 
 ## Correlation matrix
 corr_table<-data[,c(8,11,12,14,25)]
 corr_table$grade92<-as.numeric(corr_table$grade92)
 c1<-cor(corr_table)
-corrplot(c1,type = "upper", addCoef.col = 'black',tl.col = "black", tl.cex = 0.9 )
+#corrplot(c1, addCoef.col = 'black',tl.col = "black", tl.cex = 0.9, tl.srt=45 )
 
 
+chart.Correlation(corr_table, histogram = T, pch=19)
 ```
 ```{r My theme, message=FALSE, warning=FALSE, include=FALSE}
 
