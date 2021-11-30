@@ -1,0 +1,47 @@
+---
+title: "DA2-Assignment-2"
+author: "Gyongyver Kamenar (2103380)"
+date: "11/30/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r TASK}
+# Use the hotels-europe dataset and pick a city. Use hotel user rating to create a binary variable: highly_rated=1 if rating ≥ 4, 0 otherwise. Examine how high rating is related to the other hotel features in the data. 
+# 
+# Estimate linear probability, logit, and probit models with distance and stars as explanatory variables. You may add other variables if you wish. 
+# Compare coefficients, marginal differences, and predicted probabilities, and discuss your results. 
+# 
+# This is an assignment that you may do alone or in a pair within your group. You shall write a short (max 1 page, excluding exhibits) report that describes your major decisions, your estimated models, interpretations and summary. You may have a descriptive data table (optional), a regression table and up to two graphs. All codes should be pushed to your version control repo, with appropriate commit policy.
+# You need upload your report in pdf format. Add the link of your repo to the online text field.
+```
+
+```{r Libraries, include=FALSE}
+
+# Loading packages 
+if (!require("pacman")) {
+  install.packages("pacman","PerformanceAnalytics")
+}
+library(pacman)
+pacman::p_load(tidyverse, ggplot2, modelsummary,
+               kableExtra, stargazer, knitr, fixest, corrplot)
+
+```
+## Introduction
+
+## 
+
+```{r Read data and data mungling}
+hotels_europe_price <- read_csv("https://osf.io/p6tyr/download")
+hotels_europe_features <- read_csv("https://osf.io/utwjs/download")
+# Join the 2 datatable by hotel_id
+data <- left_join(hotels_europe_price, hotels_europe_features, by = "hotel_id")
+rm(hotels_europe_price,hotels_europe_features)
+
+head(data,10)
+```
+
+
