@@ -6,10 +6,13 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(
+	message = FALSE,
+	warning = FALSE
+)
 ```
 
-```{r TASK}
+```{r TASK, include=FALSE}
 # Use the hotels-europe dataset and pick a city. Use hotel user rating to create a binary variable: highly_rated=1 if rating ≥ 4, 0 otherwise. Examine how high rating is related to the other hotel features in the data. 
 # 
 # Estimate linear probability, logit, and probit models with distance and stars as explanatory variables. You may add other variables if you wish. 
@@ -27,21 +30,192 @@ if (!require("pacman")) {
 }
 library(pacman)
 pacman::p_load(tidyverse, ggplot2, modelsummary,
-               kableExtra, stargazer, knitr, fixest, corrplot)
+               kableExtra, stargazer, knitr, fixest, corrplot,PerformanceAnalytics, pscl, mfx, ggpubr, tinytex)
 
 ```
 ## Introduction
 
-## 
+## Data exploration
+To exploore the data I checked the descriptive statistics of the most relevant numerical variables
 
-```{r Read data and data mungling}
+## Models and interpretation
+
+## Summary
+
+\newpage
+
+## Appendix
+
+```{r Read data and data mungling, echo=FALSE, message=FALSE, warning=FALSE}
 hotels_europe_price <- read_csv("https://osf.io/p6tyr/download")
 hotels_europe_features <- read_csv("https://osf.io/utwjs/download")
 # Join the 2 datatable by hotel_id
 data <- left_join(hotels_europe_price, hotels_europe_features, by = "hotel_id")
-rm(hotels_europe_price,hotels_europe_features)
+dt <- data %>% filter(accommodation_type=="Hotel") %>% 
+  filter(city_actual=="Rome")
+rm(hotels_europe_price,hotels_europe_features,data)
 
-head(data,10)
+#dt %>% group_by(hotel_id) # 1455 distinct hotels
+
+dt<- dt %>% mutate( 
+     highly_rated = dplyr::case_when(
+      rating < 4  ~ 0,
+      rating >= 4 ~ 1
+    ),
+    lnprice = log( price ),
+    rating = as.numeric(rating)
+) 
+
+dt <- dt[!is.na(dt$distance) & !is.na(dt$stars) & !is.na(dt$highly_rated), ]
+
+#summary(data)
+
+
+## CORRELATION PLOT
+# numerical variables to include in the correlation matrix:
+# price, offer,weekend, nnights, distance, stars, rating, ratingta, distance_alter
+
+num_table=dt[,c(2,3,7,8,9,12,13,14,25,26)]
+correlation<-cor(num_table)
+corrplot(correlation, addCoef.col = 'black',tl.col = "black", tl.cex = 0.9, tl.srt=45,number.cex=0.7, number.digits=2 ) 
+#chart.Correlation(num_table, histogram = T, pch=19) 
+
 ```
 
+```{r Descriptive statistics, echo=FALSE}
+
+P95 <- function(x){quantile(x,0.95,na.rm=T)}
+P05 <- function(x){quantile(x,0.05,na.rm=T)}
+
+datasummary( price + distance + offer+  weekend + holiday  + stars + rating +
+            (`number of nights` = nnights ) + 
+             (`Log(price)` = lnprice ) + 
+             (`highly rated` = highly_rated ) ~
+             Mean + Median + SD + Min + Max + P05 + P25 + P75 + P95, 
+             data = dt ,
+             title = 'Descriptive statistics') %>% 
+      kable_styling(latex_options = c("HOLD_position","scale_down"))
+
+
+```
+\newpage
+
+```{r Modelling, echo=FALSE , results='asis'}
+#Estimate linear probability, logit, and probit models with distance and stars as explanatory variables. 
+#You may add other variables if you wish.
+
+LPM <- lm(highly_rated ~ distance + stars, data=dt)
+
+Logit <- glm (highly_rated ~ distance + stars, family = binomial(link="logit"), data=dt)
+
+Logit_marginal <- logitmfx(highly_rated ~ distance + stars, data=dt)
+
+Probit <- glm( highly_rated ~ distance + stars, family = binomial(link = "probit"), data = dt)
+
+Probit_marginal <- probitmfx(highly_rated ~ distance + stars, data=dt)
+
+#stargazer::stargazer(LPM,Logit, Probit, type = "latex", header = FALSE)
+ 
+cm <- c('(Intercept)' = 'Constant')
+msummary(list("LPM"=LPM, "Logit"=Logit,"Logit marginal"=Logit_marginal,"Probit"=Probit,"Probit marginal"=Probit_marginal),
+         fmt="%.3f",
+         gof_omit = 'DF|Deviance|Log.Lik.|F|R2 Adj.|AIC',
+         stars=c('*' = .05, '**' = .01),
+         coef_rename = cm,
+         notes = ''
+) %>% kable_styling(latex_options = c("HOLD_position","scale_down"))
+
+
+```
+
+```{r My theme, message=FALSE, warning=FALSE, include=FALSE}
+theme_gyongyver<-function(base_size=12){
+  # Use the basic properties of theme_bw
+  theme_light() %+replace% 
+    
+    # Change the items
+    theme(
+      # The grids on the background
+      panel.grid.major  = element_line(color = "slategray2"),
+      panel.grid.minor = element_line(color="grey90"),
+      # The background color
+      panel.background  = element_rect(fill = "grey95"),
+      # the axis line
+      axis.line         = element_line(color = "navyblue"),
+      # Littel lines called ticks on the axis
+      axis.ticks        = element_line(color = "navy"),
+      # Numbers on the axis
+      axis.text         = element_text(color = "navy"),
+      # NEW ONES
+      # rectangle element
+      rect = element_rect(fill="grey10",colour = "white"),
+      # axis title
+      axis.title = element_text(colour="mediumblue"),
+      # plot background
+      plot.background = element_rect(fill="white"),
+      # title
+      plot.title = element_text(family = "", colour="midnightblue", size=12, hjust = 0, vjust=0.8),
+      plot.subtitle = element_text(family = "", colour="midnightblue", size=10, hjust = 0),
+      #caption
+      plot.caption = element_text(size = 9, colour = "steelblue3", hjust = 1),
+      #legend
+      legend.background = element_rect(fill = "grey80", colour = "grey90"),
+      legend.text = element_text(colour = "black"),
+      panel.border = element_blank()
+      
+    )
+  
+}
+
+```
+
+```{r EDA Plots}
+
+
+```
+
+
+```{r Prediction plot, echo=FALSE, message=FALSE, warning=FALSE}
+# Predicted probabilities by the models
+dt$pred_lpm<-predict.lm(LPM)
+dt$pred_logit<-predict.glm(Logit, type="response")
+dt$pred_probit<-predict.glm(Probit, type = "response")
+
+
+
+g1<-ggplot(dt)+
+  geom_smooth(aes(x=pred_lpm, y=pred_logit),alpha=0.5 , color="blue", size=0.2, method = "loess")+
+  geom_point(aes(x=pred_lpm, y=pred_logit), alpha=0.1, color="blue")+
+  labs(
+     title="Logit model",
+     x="Predicted probability by LPM",
+     subtitle = "with 45 degree line",
+     y="Predicted probability by Logit model"
+  )+
+  theme_gyongyver()+
+  geom_line(aes(x=pred_lpm, y=pred_lpm), color="red")+
+  scale_x_continuous(limits = c(-0.1,0.8), breaks = seq(0,0.8,0.2))+
+  scale_y_continuous(limits = c(-0.1,0.8), breaks = seq(-0.1,0.8,0.1))
+
+
+g2<-ggplot(dt)+
+  geom_smooth(aes(x=pred_lpm, y=pred_probit),alpha=0.5 , color="darkgreen", size=0.2, method = "loess")+
+  geom_point(aes(x=pred_lpm, y=pred_probit), alpha=0.1, color="darkgreen")+
+  labs(
+     title="Probit model",
+     subtitle = "with 45 degree line",
+     x="Predicted probability by LPM",
+     y="Predicted probability by Probit model"
+  )+
+  theme_gyongyver()+
+  geom_line(aes(x=pred_lpm, y=pred_lpm), color="red")+
+  scale_x_continuous(limits = c(-0.1,0.8), breaks = seq(0,0.8,0.2))+
+  scale_y_continuous(limits = c(-0.1,0.8), breaks = seq(-0.1,0.8,0.1))
+
+
+
+annotate_figure(ggarrange(g1,g2),
+                top =text_grob("Predicted probability that a hotel is highly rated", 
+                color = "midnightblue", face = "bold", size = 14) )
+```
 
