@@ -1,7 +1,7 @@
 ---
 title: "DA2-Assignment-2"
 author: "Gyongyver Kamenar (2103380)"
-date: "11/30/2021"
+geometry: "left=2cm,right=2cm,top=1cm,bottom=2cm"
 output: pdf_document
 ---
 
@@ -30,32 +30,53 @@ if (!require("pacman")) {
 }
 library(pacman)
 pacman::p_load(tidyverse, ggplot2, modelsummary,
-               kableExtra, stargazer, knitr, fixest, corrplot,PerformanceAnalytics, pscl, mfx, ggpubr, tinytex)
+               kableExtra, stargazer, knitr, fixest, corrplot,PerformanceAnalytics, pscl, mfx, ggpubr, tinytex, lspline)
 
 ```
-## Introduction
+#### Introduction
+In this assignment I analyzed the relationship between hotel rating, distance from the city centre and stars of the hotel in Rome. 
+The used dataset with hotels in Europe was provided by the textbook and the hotels in Rome were selected. I built 4 different models to predict the probability that the hotel is highly rated (at least 4) based on the distance and the number of stars. 
 
-## Data exploration
-To exploore the data I checked the descriptive statistics of the most relevant numerical variables
+#### Data exploration
+The datatable contains accomodations in Europe, so I filtered for  Rome and then I explored the accomodation types. I found several different types of accomodation in the datatset but I decided to narrow down the research question just to hotels. the analysis will better represent the hotels in Rome. Besides, I omitted observation with missing distance, rating or stars and also few observations with not integer stars.
 
-## Models and interpretation
+To explore the data I checked the descriptive statistics (Table 1) of the most relevant numerical variables and also some dummy variables like offer, holiday, weekend and the highly rated, which is our variable of interest.
+Furthermore, I examined the correlation between variables as illustrated in the first plot. The variable of my interest (highly_rated) is obviously highly correlated with rating, but also with stars and price, and there is significant but negative correlation with distance too. Finally, I plotted rating with distance and stars with the loess method, which suggest that splines on distance might be useful.
 
-## Summary
+#### Models and interpretation
+The first model is the linear probability model with distance and and stars as explanatory variables and highly rated as the dependent variable. The huge drawback of this model is that the estimeted probability is not limited so practically it can be below zero or above 1 as illustrated on Figure 2. The estimated coefficients are presented in Table 2. Both explanatory variables are significant at 1% level. The coefficient of distance means, that with the same stars hotels 1 unit further from the centre  are 0.036 less likely to be highly rated on average. Considering the stars coeffiecient,among hotels with the same distance, 1 more star hotels are 0.16 more likely to be highly rated on average.
+
+The second model used the same variables but it is a logit model. Because of the functional formula the predicted probability is limited between 0 and 1. I calculated the average marginal differences (also included in Table 2) which can be interpreted similarly to the LPM. Based on the logit model, on average hotels 1 unit further are 0.045 less likely and hotels with 1 more start are 0.18 more likely to have high rating ceteris paribus. 
+
+The third one is a probit model which is very similar to the logit. The functional form is also limits the values at 0 and 1, the estimated average marginal differences for distance and starts are -0.040 and 0.176 which are between the LPM and logit but really close to both, practically it has just minor difference. 
+
+Additionally, I estimated a logit model with splines on distance because of the suggestion at the EDA as determined the breakpoint by build-in function. In this model, there is a coefficient for hotels with distance<=1.2 and and one for distance>1.2. Thus, the marginal coefficients can be interpreted as for ususal logit, but with a distinction between the distance categories.
+
+#### Prediction
+I calculated the predicted probabilities based on the 3 models and illustrated on Figure 2. The 45 degree line helps us to compare with LMP. As we can see, the LPM predictions go below zero in some cases while the logit and probit curves flatten to 0 and 1. However, around the mean the slope (marginal difference) of the 3 models are almost almost the same.
+
+#### Summary
+In this paper I used a linear probability model, a logit, a probit and an additional logit model with splines on distance to predict the probability that a hotel is highly rated explained by distance and stars.Both the distance and stars are significant in the models. The marginal differences of the models are almost identical, however logit and probit models have the adventage that they are limited at 0 and 1. Besides, based on the Bayesian information criteria, the logit model with splines is better than any of the others.
 
 \newpage
 
-## Appendix
+#
+#
+### Appendix
 
-```{r Read data and data mungling, echo=FALSE, message=FALSE, warning=FALSE}
+```{r Read data and data mungling, message=FALSE, warning=FALSE, include=FALSE}
 hotels_europe_price <- read_csv("https://osf.io/p6tyr/download")
 hotels_europe_features <- read_csv("https://osf.io/utwjs/download")
 # Join the 2 datatable by hotel_id
 data <- left_join(hotels_europe_price, hotels_europe_features, by = "hotel_id")
-dt <- data %>% filter(accommodation_type=="Hotel") %>% 
-  filter(city_actual=="Rome")
+# Filter for Rome
+dt <- data %>%  filter(city_actual=="Rome")
 rm(hotels_europe_price,hotels_europe_features,data)
+# Accomodation type
+dt %>% group_by(accommodation_type) %>% count()
+dt<- dt %>% filter(accommodation_type=="Hotel")
+dt %>% group_by(hotel_id) # Still 5327 observation and  1455 distinct hotels
 
-#dt %>% group_by(hotel_id) # 1455 distinct hotels
 
 dt<- dt %>% mutate( 
      highly_rated = dplyr::case_when(
@@ -66,19 +87,12 @@ dt<- dt %>% mutate(
     rating = as.numeric(rating)
 ) 
 
-dt <- dt[!is.na(dt$distance) & !is.na(dt$stars) & !is.na(dt$highly_rated), ]
+dt %>% group_by(stars) %>% count()
+# Remove NA-s and not integer stars (16 observations has 3.5 stars)
+dt <- dt[!is.na(dt$distance) & !is.na(dt$stars) & !is.na(dt$highly_rated) & dt$stars%%1==0, ]
 
-#summary(data)
 
-
-## CORRELATION PLOT
-# numerical variables to include in the correlation matrix:
-# price, offer,weekend, nnights, distance, stars, rating, ratingta, distance_alter
-
-num_table=dt[,c(2,3,7,8,9,12,13,14,25,26)]
-correlation<-cor(num_table)
-corrplot(correlation, addCoef.col = 'black',tl.col = "black", tl.cex = 0.9, tl.srt=45,number.cex=0.7, number.digits=2 ) 
-#chart.Correlation(num_table, histogram = T, pch=19) 
+summary(dt)
 
 ```
 
@@ -98,36 +112,22 @@ datasummary( price + distance + offer+  weekend + holiday  + stars + rating +
 
 
 ```
-\newpage
+### Correlation matrix
+```{r EDA, echo=FALSE, message=FALSE, warning=FALSE}
+## CORRELATION PLOT
+# numerical variables to include in the correlation matrix:
+# price, offer,weekend, nnights, distance, stars, rating, ratingta, distance_alter
 
-```{r Modelling, echo=FALSE , results='asis'}
-#Estimate linear probability, logit, and probit models with distance and stars as explanatory variables. 
-#You may add other variables if you wish.
+num_table=dt[,c(2,3,7,8,9,12,13,14,25,26)]
+correlation<-cor(num_table)
+corrplot(correlation, addCoef.col = 'black',tl.col = "black", tl.cex = 0.9, tl.srt=45,number.cex=0.7, number.digits=2 ) 
 
-LPM <- lm(highly_rated ~ distance + stars, data=dt)
-
-Logit <- glm (highly_rated ~ distance + stars, family = binomial(link="logit"), data=dt)
-
-Logit_marginal <- logitmfx(highly_rated ~ distance + stars, data=dt)
-
-Probit <- glm( highly_rated ~ distance + stars, family = binomial(link = "probit"), data = dt)
-
-Probit_marginal <- probitmfx(highly_rated ~ distance + stars, data=dt)
-
-#stargazer::stargazer(LPM,Logit, Probit, type = "latex", header = FALSE)
- 
-cm <- c('(Intercept)' = 'Constant')
-msummary(list("LPM"=LPM, "Logit"=Logit,"Logit marginal"=Logit_marginal,"Probit"=Probit,"Probit marginal"=Probit_marginal),
-         fmt="%.3f",
-         gof_omit = 'DF|Deviance|Log.Lik.|F|R2 Adj.|AIC',
-         stars=c('*' = .05, '**' = .01),
-         coef_rename = cm,
-         notes = ''
-) %>% kable_styling(latex_options = c("HOLD_position","scale_down"))
+#chart.Correlation(num_table, histogram = T, pch=19) 
 
 
 ```
 
+\newpage
 ```{r My theme, message=FALSE, warning=FALSE, include=FALSE}
 theme_gyongyver<-function(base_size=12){
   # Use the basic properties of theme_bw
@@ -168,20 +168,92 @@ theme_gyongyver<-function(base_size=12){
 }
 
 ```
+#
+#
+### Figure 1: Exploratory data analysis
+```{r EDA2, echo=FALSE, message=FALSE, warning=FALSE}
+f1<-ggplot(dt)+
+  geom_point(aes(x=distance, y=rating), alpha=0.5)+
+  geom_smooth(aes(x=distance, y=rating), method = "loess", color="red")+
+  labs(
+    title = "Rating and distance",
+    x="Distance",
+    y="Rating"
+    
+  )+
+  theme_gyongyver()+
+  scale_x_continuous(breaks=seq(0,16,2))
+  
 
-```{r EDA Plots}
+f2<-ggplot(dt)+
+  geom_point(aes(x=stars, y=rating), alpha=0.5)+
+  geom_smooth(aes(x=stars, y=rating), method = "loess", color="red")+
+  labs(
+    title = "Rating and stars",
+    x="Stars",
+    y="Rating"
+  )+
+  theme_gyongyver()
+
+annotate_figure(
+  ggarrange(f1,f2),
+  top =text_grob("Exploratory data analysis", 
+                color = "midnightblue", face = "bold", size = 14)
+)
 
 
 ```
 
 
+```{r Modelling, echo=FALSE , results='asis'}
+#Estimate linear probability, logit, and probit models with distance and stars as explanatory variables. 
+#You may add other variables if you wish.
+
+LPM <- feols(highly_rated ~ distance + stars, data=dt,vcov = 'hetero')
+
+Logit <- feglm (highly_rated ~ distance + stars, family = binomial(link="logit"),vcov = 'hetero', data=dt)
+
+Logit_marginal <- logitmfx(highly_rated ~ distance + stars, robust=TRUE, data=dt)
+
+Probit <- feglm( highly_rated ~ distance + stars, family = binomial(link = "probit"),vcov = 'hetero', data = dt)
+
+Probit_marginal <- probitmfx(highly_rated ~ distance + stars,robust=TRUE, data=dt)
+
+# Splines for distance
+library(segmented)
+# find the optimal breakpoint
+reg <- lm( highly_rated ~ distance , data = dt )
+fit_dist <- segmented( reg , seg.Z = ~distance, psi = list( distance=1 ) )
+#summary(fit_dist) #1.2 is the breakpoint
+
+Logit_splines <- feglm (highly_rated ~lspline(distance,1.2)  + stars, family = binomial(link="logit"),vcov = 'hetero', data=dt)
+
+splines_margin<-logitmfx(highly_rated ~lspline(distance,1.2)  + stars,robust=TRUE, data=dt)
+
+#stargazer::stargazer(LPM,Logit, Probit, type = "latex", header = FALSE)
+ 
+cm <- c('(Intercept)' = 'Constant')
+msummary(list("LPM"=LPM, "Logit"=Logit,"Logit marginal"=Logit_marginal,"Probit"=Probit,"Probit marginal"=Probit_marginal,"Splines logit"=Logit_splines,"Splines marginal"=splines_margin),
+         title = "Estimated models",
+         fmt="%.3f",
+         statistic = "std.error",
+         gof_omit = 'DF|Deviance|Log.Lik.|F|R2 Adj.|AIC|R2|PseudoR2',
+         stars=c('*' = .05, '**' = .01),
+         coef_rename = cm,
+         notes = ''
+) %>% kable_styling(latex_options = c("HOLD_position","scale_down"))
+
+
+```
+#
+#
+### Figure 2: Predicted probabilities
 ```{r Prediction plot, echo=FALSE, message=FALSE, warning=FALSE}
 # Predicted probabilities by the models
-dt$pred_lpm<-predict.lm(LPM)
-dt$pred_logit<-predict.glm(Logit, type="response")
-dt$pred_probit<-predict.glm(Probit, type = "response")
-
-
+dt$pred_lpm<-predict(LPM)
+dt$pred_logit<-predict(Logit, type="response")
+dt$pred_probit<-predict(Probit, type = "response")
+dt$pred_spline<-predict(Logit_splines, type="response")
 
 g1<-ggplot(dt)+
   geom_smooth(aes(x=pred_lpm, y=pred_logit),alpha=0.5 , color="blue", size=0.2, method = "loess")+
@@ -198,6 +270,8 @@ g1<-ggplot(dt)+
   scale_y_continuous(limits = c(-0.1,0.8), breaks = seq(-0.1,0.8,0.1))
 
 
+
+
 g2<-ggplot(dt)+
   geom_smooth(aes(x=pred_lpm, y=pred_probit),alpha=0.5 , color="darkgreen", size=0.2, method = "loess")+
   geom_point(aes(x=pred_lpm, y=pred_probit), alpha=0.1, color="darkgreen")+
@@ -212,7 +286,21 @@ g2<-ggplot(dt)+
   scale_x_continuous(limits = c(-0.1,0.8), breaks = seq(0,0.8,0.2))+
   scale_y_continuous(limits = c(-0.1,0.8), breaks = seq(-0.1,0.8,0.1))
 
-
+g3<-ggplot(dt)+
+  geom_smooth(aes(x=pred_lpm, y=pred_spline),alpha=0.5, color="lightblue", size=0.2, method = "loess")+
+  geom_point(aes(x=pred_lpm, y=pred_spline, color=as.factor(highly_rated)), alpha=0.5)+
+  labs(
+     title="Logit model with splines",
+     x="Predicted probability by LPM",
+     subtitle = "with 45 degree line",
+     y="Predicted probability by Logit model with splines",
+     color="Highly rated"
+  )+
+  theme_gyongyver()+
+  geom_line(aes(x=pred_lpm, y=pred_lpm), color="red")+
+  scale_x_continuous(limits = c(-0.1,0.8), breaks = seq(0,0.8,0.2))+
+  scale_y_continuous(limits = c(-0.1,0.8), breaks = seq(-0.1,0.8,0.1))
+#g3
 
 annotate_figure(ggarrange(g1,g2),
                 top =text_grob("Predicted probability that a hotel is highly rated", 
