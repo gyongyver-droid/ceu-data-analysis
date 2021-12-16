@@ -25,9 +25,8 @@ library(reshape2)
 library(kableExtra)
 
 # Get the data
-data("MASchools")
-df <- MASchools
-rm( MASchools )
+
+df <-read.csv('https://osf.io/g72pq/download')
 
 ```
 
