@@ -25,9 +25,14 @@ library(reshape2)
 library(kableExtra)
 
 # Get the data
+# The data is too big to load from github but it can can be loaded from OSF datastore 
+dt <-read.csv('https://osf.io/g72pq/download')
+df <-read.csv('data.csv')
+df <- df[c(2:31,127,128)] # ignore individual question scores, we are interested in the overall correctness
 
-df <-read.csv('https://osf.io/g72pq/download')
-
+summary(df)
+# Select the relavant vaiables 
+  # age, gender, natlangs, primelangs, dyslexia, 
 ```
 
 ## Introduction
