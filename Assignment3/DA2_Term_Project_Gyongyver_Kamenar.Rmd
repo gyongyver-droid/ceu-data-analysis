@@ -34,9 +34,9 @@ library(dplyr)
 
 # Get the data
 # The data is too big to load from github but it can can be loaded from OSF datastore - It takes some time
-df <-read.csv('https://osf.io/g72pq/download',encoding = "UTF-8")
+#df <-read.csv('https://osf.io/g72pq/download',encoding = "UTF-8")
 #df <-read.csv('C:/CEU/DA2/data.csv', encoding = "UTF-8")
-df <- df[c(2:31,127,128)] # ignore individual question scores, we are interested in the overall correctness
+#df <- df[c(2:31,127,128)] # ignore individual question scores, we are interested in the overall correctness
 
 ```
 
