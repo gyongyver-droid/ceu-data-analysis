@@ -1,43 +1,48 @@
 ---
-title: "Example for knitting pdf with models"
+title: "Data Analysis 2 Term Project"
+author: "Gyongyver Kamenar (2103380)"
 output: 
   pdf_document:
     extra_dependencies: ["float"]
 ---
 
 ```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	message = FALSE,
+	warning = FALSE,
+	include = FALSE
+)
 #knitr::opts_chunk$set(fig.pos = "!H", out.extra = "")
 # Set graph size
 #knitr::opts_chunk$set(echo = FALSE, out.width = "50%" )#fig.asp = 0.5, fig.width = 7, out.width = "90%" )
 
-rm(list=ls())
+#rm(list=ls())
 
 # Libraries
-#install.packages("AER")
+
 library(AER)
 library(tidyverse)
 library(lspline)
 library(fixest)
 library(modelsummary)
 library(ggpubr)
-# Extra for correlation heatmap
 library(reshape2)
 library(kableExtra)
+library(ggplot2)
+library(ggpubr)
+library(dplyr)
 
 # Get the data
-# The data is too big to load from github but it can can be loaded from OSF datastore 
-dt <-read.csv('https://osf.io/g72pq/download')
-df <-read.csv('data.csv')
+# The data is too big to load from github but it can can be loaded from OSF datastore - It takes some time
+#dt <-read.csv('https://osf.io/g72pq/download',encoding = "UTF-8")
+df <-read.csv('C:/CEU/DA2/data.csv', encoding = "UTF-8")
 df <- df[c(2:31,127,128)] # ignore individual question scores, we are interested in the overall correctness
 
-summary(df)
-# Select the relavant vaiables 
-  # age, gender, natlangs, primelangs, dyslexia, 
 ```
 
 ## Introduction
 
-This is a causal analysis on fourth graders in Massachusetts public schools in the spring of 1998. We investigating the effect of student per teacher ratio on the test results of the fourth graders. ECT.
+This paper analyze the differneces in English correctness between English learners of several different native languages. 
 
 HERE COMES THE MOTIVATION WHY THIS IS A MEANINGFUL PROJECT AND WHAT IS THE MAIN GOAL!
 
@@ -48,26 +53,137 @@ The Massachusetts data are ...
 Further information is available (here)[<https://www.rdocumentation.org/packages/AER/versions/1.2-9/topics/MASchools>].
 
 ECT.
+```{r Data cleaning and mungling, message=FALSE, warning=FALSE, include=FALSE}
+# Ckack the variables
+summary(df)
+
+## VARIABLES I WOULD DEFINITELY USE: 
+# age, 
+df %>%  group_by(age) %>% count() %>% arrange(desc(n))
+# gender, 
+df %>%  group_by(gender) %>% count() %>% arrange(desc(n))
+# natlangs/nat_eng, 
+df %>%  group_by(natlangs) %>% count() %>% arrange(desc(n))
+df %>%  group_by(nat_Eng) %>% count() %>% arrange(desc(n))
+# primelangs/prime_eng, 
+df %>%  group_by(primelangs) %>% count() %>% arrange(desc(n))
+df %>%  group_by(prime_Eng) %>% count() %>% arrange(desc(n))
+# psychiatric
+df %>%  group_by(psychiatric) %>% count() %>% arrange(desc(n))
+# highest level of education
+df %>%  group_by(education) %>% count() %>% arrange(desc(n))
+# Eng_start
+df %>%  group_by(Eng_start) %>% count() %>% arrange(desc(n))
+# Eng_little
+df %>%  group_by(Eng_little) %>% count() %>% arrange(desc(n))
+# correct / elogit
+df %>%  group_by(correct) %>% count() %>% arrange(desc(n))
+
+## VARIABLES NOT TO USE:
+# dyslexia --> No variation
+# Eng_country_yrs --> too much NAs
+# already_participated --> No variation
+# dictionary --> No variation
+# US_region, UK_region, Can_region --> no relevance in the research question
+# Ebonics --> no relevance
+# Lived_Eng_per ---> too much NAs 
+# 
+
+## QUESTIONABLE VARIABLES: 
+#   house_Eng
+df %>%  group_by(house_Eng) %>% count() %>% arrange(desc(n)) # --- too much NULL values
+#   countries
+df %>%  group_by(countries) %>% count() %>% arrange(desc(n)) # too much distinct values
+#   currcountry
+df %>%  group_by(currcountry) %>% count() %>% arrange(desc(n)) # too much distinct values
+
+df<-df %>% select(id, age, gender, education,
+              natlangs,nat_Eng, primelangs, prime_Eng,
+              house_Eng,countries, currcountry, psychiatric,
+              Eng_start, Eng_little, correct, elogit)
+
+## filter Eng_little to include just monoeng (native speaker of english only) and little=non-immersion learners
+df<-filter(df, df$Eng_little %in% c("monoeng", 'little'))
+
+## clean and filter natlangs variable
+langs<-head(df %>%  group_by(natlangs) %>% count() %>% arrange(desc(n)),10)
+df<-filter(df, df$natlangs %in% langs$natlangs)
+
+## clean and filter education variable
+educ <- df %>% group_by(education) %>% count() %>% arrange(desc(n))
+View(educ)
 
 
-```{r, echo=FALSE}
+educ$education[1:7]
+
+
+df$education<-lapply(df$education,function(x){
+  gsub("Lisans Derecesi (3-5 yÄ±l daha yÃ¼ksek ed)",
+                   "Undergraduate Degree (3-5 years higher ed)",x)
+  gsub("Didn't Finish High School (less than 13 years ed)",
+     "Haven't Finished High School (less than 13 years ed)",x)
+  gsub("BazÄ± Ãœniversite (daha yÃ¼ksek ed)","Some Undergrad (higher ed)",x)
+  gsub("Lise Derecesi (12-13 yaÅŸ)",
+                   "High School Degree (12-13 years)",x)
+  gsub("Egyetemi diploma (3-5 évvel magasabb ed)",
+                   "Undergraduate Degree (3-5 years higher ed)",x)
+  gsub("YÃ¼ksek Lisans","Graduate Degree",x)
+  } 
+)
+
+
+
+df$education<-lapply(df$education,function(x){
+  gsub("Didn't Finish",
+     "Haven't Finished",
+                   x)
+})
+                     
+
+df$education<-gsub("BazÄ± Ãœniversite (daha yÃ¼ksek ed)","Some Undergrad (higher ed)",df$education)
+ 
+df$education<-gsub("Lise Derecesi (12-13 yaÅŸ)",
+                   "High School Degree (12-13 years)",
+                   df$education)
+
+df$education<-gsub("Egyetemi diploma (3-5 évvel magasabb ed)",
+                   "Undergraduate Degree (3-5 years higher ed)",
+                   df$education)
+
+df$education<-gsub("YÃ¼ksek Lisans","Graduate Degree",df$education)
+
+df$education<-unlist(df$education)
+df<-filter(df,df$education %in% educ$education[1:7])
+
+## Set base categories
+
+df <-df %>% mutate(
+  education=as.factor(education),
+  natlangs = as.factor(natlangs),
+  Eng_little = as.factor(Eng_little),
+  education = relevel(education,ref = "Haven't Finished High School (less than 13 years ed)"),
+  natlangs = relevel(natlangs, ref = "English"),
+  Eng_little = relevel(Eng_little,ref = "monoeng")
+  
+)
+```
+
+
+```{r Descriptive statistics, echo=FALSE, message=FALSE, warning=FALSE}
 # Sample selection
-df <- df %>% select( score4 , stratio, english, 
-                     income, scratio, exptot, special,
-                     lunch, salary ) %>% drop_na()
+df<- df %>% select( age, gender, education, 
+                     Eng_start, natlangs, nat_Eng, primelangs, prime_Eng,
+                     psychiatric , correct, elogit, Eng_little ) %>% drop_na()
 
 P95 <- function(x){quantile(x,0.95,na.rm=T)}
 P05 <- function(x){quantile(x,0.05,na.rm=T)}
-datasummary( (`Overall Grade` = score4 ) + 
-             (`Student to teacher ratio` = stratio ) + 
-             (`Percent of english learner` = english ) + 
-             (`Income per capita` = income) + 
-             (`Student to computer ratio` = scratio) + 
-             (`Total Expenditure ($)` = exptot) + 
-             (`Special education students (%)` = special )+
-             (`Percent qualifying for reduced-price lunch` = lunch ) +
-             (`Average teacher hourly wage ($)` = salary ) ~
-             Mean + Median + SD + Min + Max + P05 + P95 , 
+datasummary( (`Age` = age ) + 
+             (`Highest level of education` = education ) + 
+             (`Age at start of English learning` = Eng_start ) + 
+             (`Psychiatric disorder` = psychiatric) + 
+             (`Critical items correct (%)` = correct) + 
+             (`Log(correct)` = elogit)  ~
+             Mean + Median + SD + Min + Max + P05 + P95  , 
              data = df ,
              title = 'Descriptive statistics') %>% 
       kable_styling(latex_options = c("HOLD_position","scale_down"))
@@ -79,22 +195,89 @@ DESCRIPTION OF THE SUMMARY STATS: WHAT CAN WE LEARN FROM THEM?
 
 As the focus is the price difference, the next Figure shows the histogram for this variable.
 
-```{r, echo=FALSE, warning=FALSE, fig.width=8, fig.height = 3, fig.align="center" }
-# score 4
-p1 <- ggplot( df , aes(x = score4)) +
-  geom_histogram( binwidth = 5, fill='navyblue', color = 'white' ) +
-  labs(y = 'Count',x = "Averaged values of test scores for schools") +
-  theme_bw()
+```{r My theme, message=FALSE, warning=FALSE, include=FALSE}
+theme_gyongyver<-function(base_size=12){
+  # Use the basic properties of theme_bw
+  theme_light() %+replace% 
+    
+    # Change the items
+    theme(
+      # The grids on the background
+      panel.grid.major  = element_line(color = "slategray2"),
+      panel.grid.minor = element_line(color="grey90"),
+      # The background color
+      panel.background  = element_rect(fill = "grey95"),
+      # the axis line
+      axis.line         = element_line(color = "navyblue"),
+      # Littel lines called ticks on the axis
+      axis.ticks        = element_line(color = "navy"),
+      # Numbers on the axis
+      axis.text         = element_text(color = "navy"),
+      # NEW ONES
+      # rectangle element
+      rect = element_rect(fill="grey10",colour = "white"),
+      # axis title
+      axis.title = element_text(colour="mediumblue"),
+      # plot background
+      plot.background = element_rect(fill="white"),
+      # title
+      plot.title = element_text(family = "", colour="midnightblue", size=14, hjust = 0, vjust=0.8),
+      plot.subtitle = element_text(family = "", colour="midnightblue", size=12, hjust = 0),
+      #caption
+      plot.caption = element_text(size = 9, colour = "steelblue3", hjust = 1),
+      #legend
+      legend.background = element_rect(fill = "grey80", colour = "grey90"),
+      legend.text = element_text(colour = "black"),
+      panel.border = element_blank()
+      
+    )
+  
+}
 
-# stratio
-p2 <- ggplot( df , aes(x = stratio)) +
-  geom_histogram(binwidth = 0.5,fill='navyblue', color = 'white' ) +
-  labs(y = 'Count',x = "Student to teacher ratio") +
-  theme_bw()
+```
 
-association_figs <- ggarrange(p1, p2,
+
+```{r EDA, eval=FALSE, fig.align="center", fig.height=3, fig.width=8, warning=FALSE, include=FALSE}
+# correct
+p1 <- ggplot( df , aes(x = correct)) +
+  geom_histogram(  fill='navyblue', color = 'white' ) +
+  labs(
+    y = 'Count',
+    x = "Correct English test items (%)") +
+  theme_gyongyver()+
+  scale_x_continuous(limits = c(0.65,1),labels = scales::percent)
+p1
+# logit of correct
+p2 <- ggplot( df , aes(x = elogit)) +
+  geom_histogram(  fill='navyblue', color = 'white' ) +
+  labs(
+    y = 'Count',
+    x = "Log(Correct English test items%)") +
+  theme_gyongyver()+
+  scale_x_continuous(limits = c(0,6),breaks=seq(0,6,0.5))
+p2
+# age
+p3 <- ggplot( df , aes(x = age)) +
+  geom_histogram(  fill='navyblue', color = 'white' ) +
+  labs(
+    y = 'Count',
+    x = "Age") +
+  theme_gyongyver()+
+  scale_x_continuous(limits = c(10,75),breaks=seq(10,75,10))
+p3
+# age at start of English learning
+p4 <- ggplot( df , aes(x = Eng_start)) +
+  geom_histogram( fill='navyblue', color = 'white' , bins = 15) +
+  labs(
+    y = 'Count',
+    x = "Age at start of English learning") +
+  theme_gyongyver()
+p4
+
+
+association_figs <- ggarrange(p1, p2,p3, p4,
                        hjust = -0.6,
-                       ncol = 2, nrow = 1)
+                       ncol = 2, nrow = 2)
 association_figs
 
 ```
@@ -105,7 +288,7 @@ DESCRIPTION OF THE FIGURE. WHAT DOES IT TELS US?
 
 The key pattern of association is:
 
-```{r, echo=FALSE, warning=FALSE, fig.width=4, fig.height = 3, fig.align="center" }
+```{r Patterns of association, echo=FALSE, fig.align="center", fig.height=3, fig.width=4, warning=FALSE}
 chck_sp <- function( x_var , x_lab ){
   ggplot( df , aes(x = x_var, y = score4)) +
     geom_point(color='red',size=2,alpha=0.6) +
@@ -113,6 +296,10 @@ chck_sp <- function( x_var , x_lab ){
     labs(x = x_lab, y = "Averaged values of test scores") +
     theme_bw()
 }
+
+ggplot(df)+
+  geom_point(aes(x=age, y=correct))+
+  theme_gyongyver()
 
 # Our main interest: student-to-teacher ratio:
 chck_sp(df$stratio,'Student-to-teacher ratio')
@@ -123,14 +310,15 @@ How will you include this in your model?
 
 Short description on the other variables: 2-10 sentence depends on the amount of variables you have. You should reference your decisions on the graphs/analysis which are located in the appendix.
 
-## Model
+## Models
 
 
 ```{r, echo = FALSE }
 
 # reg1: NO control, simple linear regression
-reg1 <- feols( score4 ~ stratio , data = df , vcov = 'hetero' )
-
+reg1 <- feols( correct ~ age + gender + natlangs+ education + nat_Eng, data = df , vcov = 'hetero' )
+summary(reg1)
+reg1
 # reg2: NO controls, use piecewise linear spline(P.L.S) with a knot at 18
 reg2 <- feols( score4 ~ lspline( stratio , 18 ) , data = df , vcov = 'hetero' )
 
@@ -174,7 +362,7 @@ I have the t-statistic as `r round( reg5$coeftable[2,3] , 2 )` and the p-value a
 
 We compare multiple models to learn about the stability of the parameters. Bla-bla:
 
-```{r, echo = FALSE }
+```{r, Regression table, echo = FALSE }
 ##
 # Summarize our findings:
 varname_report <- c("(Intercept)" = "Intercept",
@@ -223,6 +411,7 @@ Task: calculate and report t-tests for each countries.
 
 HERE COMES WHAT WE HAVE LEARNED AND WHAT WOULD STRENGHTEN AND WEAKEN OUR ANALYSIS.
 
+\newpage 
 ## Appendix
 
 Here comes all the results which are referenced and not essential for understanding the MAIN results.
