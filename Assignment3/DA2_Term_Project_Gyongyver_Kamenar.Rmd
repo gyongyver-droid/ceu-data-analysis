@@ -6,7 +6,7 @@ output:
     extra_dependencies: ["float"]
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, message=FALSE, warning=FALSE}
 knitr::opts_chunk$set(
 	message = FALSE,
 	warning = FALSE
@@ -15,7 +15,7 @@ knitr::opts_chunk$set(
 # Set graph size
 #knitr::opts_chunk$set(echo = FALSE, out.width = "50%" )#fig.asp = 0.5, fig.width = 7, out.width = "90%" )
 
-#rm(list=ls())
+rm(list=ls())
 
 # Libraries
 
@@ -39,9 +39,7 @@ library(scales)
 # dt <-read.csv('https://media.githubusercontent.com/media/gyongyver-droid/ceu-data-analysis/master/Assignment3/data.csv?token=ANZLCU2736Q7PUXOAX4KFCTBX5GFE', encoding = "UTF-8")
 # 
 # data<-read.csv('https://github.com/gyongyver-droid/ceu-data-analysis/raw/master/Assignment3/data.csv',encoding = 'UTF-8')
-
-df <-read.csv('data.csv', encoding = "UTF-8")
-df <- df[c(2:31,127,128)] # ignore individual question scores, we are interested in the overall correctness
+df<-read.csv('clean_data.csv', encoding = "UTF-8")
 
 ```
 
@@ -54,9 +52,12 @@ HERE COMES THE MOTIVATION WHY THIS IS A MEANINGFUL PROJECT AND WHAT IS THE MAIN 
 
 ## Data
 
+### Origin
+
 The Massachusetts data are ...
 Further information is available (here)[<https://www.rdocumentation.org/packages/AER/versions/1.2-9/topics/MASchools>].
 
+### Variables
 ECT.
 ```{r Data cleaning and mungling, message=FALSE, warning=FALSE, include=FALSE}
 # Ckack the variables
@@ -64,7 +65,7 @@ summary(df)
 
 ## VARIABLES I WOULD DEFINITELY USE: 
 # age, 
-df %>%  group_by(age) %>% count() %>% arrange(desc(n))
+df %>%  group_by(age) %>% count() %>% arrange(age)
 # gender, 
 df %>%  group_by(gender) %>% count() %>% arrange(desc(n))
 # natlangs/nat_eng, 
@@ -84,70 +85,30 @@ df %>%  group_by(Eng_little) %>% count() %>% arrange(desc(n))
 # correct / elogit
 df %>%  group_by(correct) %>% count() %>% arrange(desc(n))
 
-## VARIABLES NOT TO USE:
-# dyslexia --> No variation
-# Eng_country_yrs --> too much NAs
-# already_participated --> No variation
-# dictionary --> No variation
-# US_region, UK_region, Can_region --> no relevance in the research question
-# Ebonics --> no relevance
-# Lived_Eng_per ---> too much NAs 
-# 
-
-## QUESTIONABLE VARIABLES: 
-#   house_Eng
-df %>%  group_by(house_Eng) %>% count() %>% arrange(desc(n)) # --- too much NULL values
-#   countries
-df %>%  group_by(countries) %>% count() %>% arrange(desc(n)) # too much distinct values
-#   currcountry
-df %>%  group_by(currcountry) %>% count() %>% arrange(desc(n)) # too much distinct values
-
-df<-df %>% select(id, age, gender, education,
-              natlangs,nat_Eng, primelangs, prime_Eng,
-              house_Eng,countries, currcountry, psychiatric,
-              Eng_start, Eng_little, correct, elogit)
-
-## filter Eng_little to include just monoeng (native speaker of english only) and little=non-immersion learners
-df<-filter(df, df$Eng_little %in% c("monoeng", 'little'))
-
-## clean and filter natlangs variable
-langs<-head(df %>%  group_by(natlangs) %>% count() %>% arrange(desc(n)),10)
-df<-filter(df, df$natlangs %in% langs$natlangs)
-
-## clean and filter education variable
-educ <- df %>% group_by(education) %>% count() %>% arrange(desc(n))
-View(educ)
-
-df$education<-lapply(df$education,function(x){
-  gsub("Didn't Finish",
-     "Haven't Finished",
-                   x)
-})
-
-                     
-df$education<-unlist(df$education)
-df<-filter(df,df$education %in% educ$education[1:6])
-
 ## Set base categories
 
 df <-df %>% mutate(
+  age = as.numeric(age),
+  Eng_start = as.numeric(Eng_start),
+  prime_Eng = as.numeric(prime_Eng),
   education=as.factor(education),
   natlangs = as.factor(natlangs),
   Eng_little = as.factor(Eng_little),
+  learning = age - Eng_start,
   education = relevel(education,ref = "Haven't Finished High School (less than 13 years ed)"),
   natlangs = relevel(natlangs, ref = "English"),
   Eng_little = relevel(Eng_little,ref = "monoeng")
   
 )
 
-#write.table(df,file = "clean_data.csv")
+foreign<-filter(df,df$nat_Eng==0)
 
 ```
 
 
 ```{r Descriptive statistics, echo=FALSE, message=FALSE, warning=FALSE}
 # Sample selection
-df<- df %>% select( age, gender, education, 
+df<- df %>% select( age, gender, education, learning,
                      Eng_start, natlangs, nat_Eng, primelangs, prime_Eng,
                      psychiatric , correct, elogit, Eng_little ) %>% drop_na()
 
@@ -156,7 +117,8 @@ P05 <- function(x){quantile(x,0.05,na.rm=T)}
 datasummary( (`Age` = age ) +  
              (`Age at start of English learning` = Eng_start ) + 
              (`Psychiatric disorder` = psychiatric) + 
-             (`Critical items correct (%)` = correct) + 
+             (`Critical items correct (%)` = correct) +
+               (`Years of English learning` = learning) +
              (`Log(correct)` = elogit)  ~
              Mean + Median + SD + Min + Max + P05 + P95 , 
              data = df ,
@@ -171,7 +133,7 @@ DESCRIPTION OF THE SUMMARY STATS: WHAT CAN WE LEARN FROM THEM?
 As the focus is the price difference, the next Figure shows the histogram for this variable.
 
 ```{r My theme, message=FALSE, warning=FALSE, include=FALSE}
-theme_gyongyver<-function(base_size=12){
+theme_gyongyver<-function(base_size=11){
   # Use the basic properties of theme_bw
   theme_light() %+replace% 
     
@@ -196,8 +158,8 @@ theme_gyongyver<-function(base_size=12){
       # plot background
       plot.background = element_rect(fill="white"),
       # title
-      plot.title = element_text(family = "", colour="midnightblue", size=14, hjust = 0, vjust=0.8),
-      plot.subtitle = element_text(family = "", colour="midnightblue", size=11, hjust = 0),
+      plot.title = element_text(family = "", colour="midnightblue", size=12, hjust = 0, vjust=0.8),
+      plot.subtitle = element_text(family = "", colour="midnightblue", size=10, hjust = 0),
       #caption
       plot.caption = element_text(size = 9, colour = "steelblue3", hjust = 1),
       #legend
@@ -223,7 +185,7 @@ p1 <- ggplot( df , aes(x = correct)) +
   theme_gyongyver()+
   scale_x_continuous(limits = c(0.65,1),labels = scales::percent)+
   scale_y_continuous(labels = label_number(suffix = " K", scale = 1e-3))
-p1
+
 # logit of correct
 p2 <- ggplot( df , aes(x = elogit)) +
   geom_histogram(  fill='navyblue', color = 'white' ) +
@@ -234,7 +196,7 @@ p2 <- ggplot( df , aes(x = elogit)) +
   theme_gyongyver()+
   scale_x_continuous(limits = c(0,6),breaks=seq(0,6,0.5))+
   scale_y_continuous(labels = label_number(suffix = " K", scale = 1e-3))
-p2
+
 # age
 p3 <- ggplot( df , aes(x = age)) +
   geom_histogram(  fill='navyblue', color = 'white' ) +
@@ -245,7 +207,7 @@ p3 <- ggplot( df , aes(x = age)) +
   theme_gyongyver()+
   scale_x_continuous(limits = c(10,75),breaks=seq(10,75,10))+
   scale_y_continuous(labels = label_number(suffix = " K", scale = 1e-3))
-p3
+
 # age at start of English learning
 p4 <- ggplot( df , aes(x = Eng_start)) +
   geom_histogram( fill='navyblue', color = 'white', bins = 12 ) +
@@ -256,11 +218,11 @@ p4 <- ggplot( df , aes(x = Eng_start)) +
   theme_gyongyver()+
   scale_x_continuous(limits = c(-5,30))+
   scale_y_continuous(labels = label_number(suffix = " K", scale = 1e-3))
-p4
+
 
 
 distribution_figs <- ggarrange(p1, p2,p3, p4,
-                       hjust = -0.6,
+                       hjust = -0.3,
                        ncol = 2, nrow = 2)
 distribution_figs
 
@@ -268,14 +230,18 @@ distribution_figs
 df %>%  group_by(natlangs) %>% count() %>% arrange(desc(n)) %>% 
   ggplot(aes(x=natlangs, y=n))+
   geom_bar(stat='identity', fill="navyblue")+
+  geom_text(aes(label=n), vjust=-0.3, size=4) +
   theme_gyongyver()+
   labs(
     title = "Frequency of native languages",
     x="",
     y=""
   )+
-  scale_y_continuous(labels = label_number(suffix = " K", scale = 1e-3))
+  scale_y_continuous(labels = label_number(suffix = " K", scale = 1e-3))+
+  theme(axis.text.x = element_text(size = 9))
 
+
+plot(df$natlangs, df$correct)
 ```
 
 DESCRIPTION OF THE FIGURE. WHAT DOES IT TELS US?
@@ -288,7 +254,7 @@ The key pattern of association is:
 
 # Scatterplots
 f1<-ggplot(df, aes(x=Eng_start, y=correct))+
-  geom_point( alpha=0.1, color="navyblue")+
+  geom_point( alpha=0.05, color="navyblue")+
   geom_smooth(method = "gam", color="red")+
   facet_wrap(~natlangs, ncol = 4)+
   theme_gyongyver()+
@@ -301,7 +267,7 @@ f1<-ggplot(df, aes(x=Eng_start, y=correct))+
 f1  
 
 f2<-ggplot(df, aes(x=age, y=correct))+
-  geom_point( alpha=0.1, color="navyblue")+
+  geom_point( alpha=0.05, color="navyblue")+
   geom_smooth(method = "gam", color="red")+
   facet_wrap(~natlangs, ncol = 4)+
   theme_gyongyver()+
@@ -313,22 +279,27 @@ f2<-ggplot(df, aes(x=age, y=correct))+
 f2
 
 
-# Lowess
+# Smooth
 filter(df, df$natlangs=="Dutch") %>% 
 ggplot()+
   geom_smooth(aes(x=Eng_start, y=correct), color="red", method = "gam")+
   geom_point(aes(x=Eng_start, y=correct), alpha= 0.2, color="navyblue")+
   theme_gyongyver()
   
+```
+
+```{r Smoothed plots, echo=FALSE, message=FALSE, warning=FALSE}
+f2
+f1
 
 # Correlation matrix
-matrix<-cor(df[,c(1,4,6,8,9,10,11)])
+matrix<-cor(df[,c(1,4,6,8,9,10,11,13)])
 colnames(matrix)<-c("Age", "English starting age","Native English","Primary English", "Psychiatric", "English correctness",
-                    "Log of English correctness")
+                    "Log of English correctness","Years of English learning")
 rownames(matrix)<-c("Age", "English starting age","Native English","Primary English", "Psychiatric", "English correctness",
-                    "Log of English correctness")
+                    "Log of English correctness","Years of English learning")
 
-corrplot(matrix,addCoef.col = 'black',tl.col = "black",
+corrplot(matrix,addCoef.col = 'grey50',tl.col = "black",
          tl.cex = 0.9, tl.srt=45,number.cex=0.8, number.digits=2)
 
 ```
@@ -367,8 +338,8 @@ stat_binscatter <- function(mapping = NULL, data = NULL, geom = "point",
 }
 
 ggplot(df, aes(x=Eng_start, y=elogit))+
-  geom_point(alpha=.05, color="navyblue")+
-  stat_binscatter(color="red",bins=60,geom = "pointrange")+
+  geom_point(alpha=.01, color="navyblue")+
+  stat_binscatter(color="red",bins=30,geom = "pointrange")+
   theme_gyongyver()
   
 ```
@@ -387,16 +358,16 @@ reg1 <- feols( correct ~ natlangs, data = df , vcov = 'hetero' )
 summary(reg1)
 
 # reg2: With controls
-reg2<- feols( correct ~ age + gender + natlangs+ education +psychiatric , data = df , vcov = 'hetero' )
+reg2<- feols( correct ~ age + gender + natlangs+ education +psychiatric+Eng_start , data = df , vcov = 'hetero' )
 summary(reg2)
 
-# reg3: control for english learners dummy (english_d) only. 
+# reg3: additional control for starting age of English learning
 #   Is your parameter different? Is it a confounder?
 
-reg3 <-feols( correct ~ age + gender + natlangs+ education +psychiatric+ Eng_start , data = df , vcov = 'hetero' )
+reg3 <-feols( correct ~ gender + natlangs+ education +psychiatric +learning +Eng_start , data = df , vcov = 'hetero' )
 summary(reg3)
 ##
-# reg4: reg3 + Schools' special students measures (lunch with P.L.S, knot: 15; and special)
+# reg4: reg3 + slines of starting age of English learning
 reg4 <- feols( correct ~ age + gender + natlangs+ education + psychiatric +lspline(Eng_start,2) , data = df , vcov = 'hetero' )
 summary(reg4)
 #
@@ -407,10 +378,17 @@ reg5 <- feols( correct ~ age + gender + natlangs+ education + psychiatric +lspli
 
 etable(reg1,reg2,reg3,reg4,reg5)
 
+# Test difference
+library(car)
+linearHypothesis(reg5, "natlangsPolish - natlangsHungarian = 0")
+linearHypothesis(reg5, "age - Eng_start = 0")
+linearHypothesis(reg4,"lspline(Eng_start, 2)1 - lspline(Eng_start, 2)2 = 0")
+linearHypothesis(reg5, "gendermale - genderother = 0")
 # Naming the coefficients for pretty output
 alpha  <- round( reg5$coeftable[1,1] , 2 )
 b1 <- round( reg5$coeftable[2,1] , 2 )
 b2 <- round( reg5$coeftable[3,1] , 2 )
+
 ```
 
 My preferred model is:
@@ -476,8 +454,8 @@ style_noHeaders = style.tex(var.title = "", fixef.title = "", stats.title = " ")
 #        "latex", booktabs = TRUE,  position = "H",
 #        caption = 'Models to uncover relation between test score and student to teacher ratio') %>% kable_styling(latex_options = c("hold_position","scale_down"))
 
-msummary(list("LPM"=reg1, "Logit"=reg2,"Logit marginal"=reg3,
-              "Probit"=reg4,"Probit marginal"=reg5),
+msummary(list("Simple"=reg1, "Multiple"=reg2,"Multiple with starting age"=reg3,
+              "Splines"=reg4,"Splines"=reg5),
          title = "Estimated models",
          fmt="%.3f",
          statistic = "std.error",
