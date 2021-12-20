@@ -9,8 +9,7 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
 	message = FALSE,
-	warning = FALSE,
-	include = FALSE
+	warning = FALSE
 )
 #knitr::opts_chunk$set(fig.pos = "!H", out.extra = "")
 # Set graph size
@@ -31,12 +30,18 @@ library(kableExtra)
 library(ggplot2)
 library(ggpubr)
 library(dplyr)
+library(corrplot)
+library(scales)
 
 # Get the data
 # The data is too big to load from github but it can can be loaded from OSF datastore - It takes some time
-#df <-read.csv('https://osf.io/g72pq/download',encoding = "UTF-8")
-#df <-read.csv('C:/CEU/DA2/data.csv', encoding = "UTF-8")
-#df <- df[c(2:31,127,128)] # ignore individual question scores, we are interested in the overall correctness
+#dt <-read.csv('https://osf.io/g72pq/download',encoding = "UTF-8")
+# dt <-read.csv('https://media.githubusercontent.com/media/gyongyver-droid/ceu-data-analysis/master/Assignment3/data.csv?token=ANZLCU2736Q7PUXOAX4KFCTBX5GFE', encoding = "UTF-8")
+# 
+# data<-read.csv('https://github.com/gyongyver-droid/ceu-data-analysis/raw/master/Assignment3/data.csv',encoding = 'UTF-8')
+
+df <-read.csv('data.csv', encoding = "UTF-8")
+df <- df[c(2:31,127,128)] # ignore individual question scores, we are interested in the overall correctness
 
 ```
 
@@ -113,47 +118,15 @@ df<-filter(df, df$natlangs %in% langs$natlangs)
 educ <- df %>% group_by(education) %>% count() %>% arrange(desc(n))
 View(educ)
 
-
-educ$education[1:7]
-
-
-df$education<-lapply(df$education,function(x){
-  gsub("Lisans Derecesi (3-5 yÄ±l daha yÃ¼ksek ed)",
-                   "Undergraduate Degree (3-5 years higher ed)",x)
-  gsub("Didn't Finish High School (less than 13 years ed)",
-     "Haven't Finished High School (less than 13 years ed)",x)
-  gsub("BazÄ± Ãœniversite (daha yÃ¼ksek ed)","Some Undergrad (higher ed)",x)
-  gsub("Lise Derecesi (12-13 yaÅŸ)",
-                   "High School Degree (12-13 years)",x)
-  gsub("Egyetemi diploma (3-5 évvel magasabb ed)",
-                   "Undergraduate Degree (3-5 years higher ed)",x)
-  gsub("YÃ¼ksek Lisans","Graduate Degree",x)
-  } 
-)
-
-
-
 df$education<-lapply(df$education,function(x){
   gsub("Didn't Finish",
      "Haven't Finished",
                    x)
 })
+
                      
-
-df$education<-gsub("BazÄ± Ãœniversite (daha yÃ¼ksek ed)","Some Undergrad (higher ed)",df$education)
- 
-df$education<-gsub("Lise Derecesi (12-13 yaÅŸ)",
-                   "High School Degree (12-13 years)",
-                   df$education)
-
-df$education<-gsub("Egyetemi diploma (3-5 évvel magasabb ed)",
-                   "Undergraduate Degree (3-5 years higher ed)",
-                   df$education)
-
-df$education<-gsub("YÃ¼ksek Lisans","Graduate Degree",df$education)
-
 df$education<-unlist(df$education)
-df<-filter(df,df$education %in% educ$education[1:7])
+df<-filter(df,df$education %in% educ$education[1:6])
 
 ## Set base categories
 
@@ -166,6 +139,9 @@ df <-df %>% mutate(
   Eng_little = relevel(Eng_little,ref = "monoeng")
   
 )
+
+#write.table(df,file = "clean_data.csv")
+
 ```
 
 
@@ -177,16 +153,15 @@ df<- df %>% select( age, gender, education,
 
 P95 <- function(x){quantile(x,0.95,na.rm=T)}
 P05 <- function(x){quantile(x,0.05,na.rm=T)}
-datasummary( (`Age` = age ) + 
-             (`Highest level of education` = education ) + 
+datasummary( (`Age` = age ) +  
              (`Age at start of English learning` = Eng_start ) + 
              (`Psychiatric disorder` = psychiatric) + 
              (`Critical items correct (%)` = correct) + 
              (`Log(correct)` = elogit)  ~
-             Mean + Median + SD + Min + Max + P05 + P95  , 
+             Mean + Median + SD + Min + Max + P05 + P95 , 
              data = df ,
              title = 'Descriptive statistics') %>% 
-      kable_styling(latex_options = c("HOLD_position","scale_down"))
+      kable_styling(latex_options = c("HOLD_position","scale_down"), font_size = 11)
 ```
 
 The number of observations is `r sum(!is.na(df$score4))` for all of our key variables.
@@ -222,7 +197,7 @@ theme_gyongyver<-function(base_size=12){
       plot.background = element_rect(fill="white"),
       # title
       plot.title = element_text(family = "", colour="midnightblue", size=14, hjust = 0, vjust=0.8),
-      plot.subtitle = element_text(family = "", colour="midnightblue", size=12, hjust = 0),
+      plot.subtitle = element_text(family = "", colour="midnightblue", size=11, hjust = 0),
       #caption
       plot.caption = element_text(size = 9, colour = "steelblue3", hjust = 1),
       #legend
@@ -237,48 +212,69 @@ theme_gyongyver<-function(base_size=12){
 ```
 
 
-```{r EDA, eval=FALSE, fig.align="center", fig.height=3, fig.width=8, warning=FALSE, include=FALSE}
+```{r EDA, echo=FALSE, fig.align="center", warning=FALSE}
 # correct
 p1 <- ggplot( df , aes(x = correct)) +
   geom_histogram(  fill='navyblue', color = 'white' ) +
   labs(
+    title = "Distribution of English correctness",
     y = 'Count',
     x = "Correct English test items (%)") +
   theme_gyongyver()+
-  scale_x_continuous(limits = c(0.65,1),labels = scales::percent)
+  scale_x_continuous(limits = c(0.65,1),labels = scales::percent)+
+  scale_y_continuous(labels = label_number(suffix = " K", scale = 1e-3))
 p1
 # logit of correct
 p2 <- ggplot( df , aes(x = elogit)) +
   geom_histogram(  fill='navyblue', color = 'white' ) +
   labs(
+    title = "Distribution of Log of English correctness",
     y = 'Count',
     x = "Log(Correct English test items%)") +
   theme_gyongyver()+
-  scale_x_continuous(limits = c(0,6),breaks=seq(0,6,0.5))
+  scale_x_continuous(limits = c(0,6),breaks=seq(0,6,0.5))+
+  scale_y_continuous(labels = label_number(suffix = " K", scale = 1e-3))
 p2
 # age
 p3 <- ggplot( df , aes(x = age)) +
   geom_histogram(  fill='navyblue', color = 'white' ) +
   labs(
+    title = "Distribution of age",
     y = 'Count',
     x = "Age") +
   theme_gyongyver()+
-  scale_x_continuous(limits = c(10,75),breaks=seq(10,75,10))
+  scale_x_continuous(limits = c(10,75),breaks=seq(10,75,10))+
+  scale_y_continuous(labels = label_number(suffix = " K", scale = 1e-3))
 p3
 # age at start of English learning
 p4 <- ggplot( df , aes(x = Eng_start)) +
-  geom_histogram( fill='navyblue', color = 'white' , bins = 15) +
+  geom_histogram( fill='navyblue', color = 'white', bins = 12 ) +
   labs(
+    title = "Distribution of age at start of English learning",
     y = 'Count',
     x = "Age at start of English learning") +
-  theme_gyongyver()
+  theme_gyongyver()+
+  scale_x_continuous(limits = c(-5,30))+
+  scale_y_continuous(labels = label_number(suffix = " K", scale = 1e-3))
 p4
 
 
-association_figs <- ggarrange(p1, p2,p3, p4,
+distribution_figs <- ggarrange(p1, p2,p3, p4,
                        hjust = -0.6,
                        ncol = 2, nrow = 2)
-association_figs
+distribution_figs
+
+# frequency of native languages
+df %>%  group_by(natlangs) %>% count() %>% arrange(desc(n)) %>% 
+  ggplot(aes(x=natlangs, y=n))+
+  geom_bar(stat='identity', fill="navyblue")+
+  theme_gyongyver()+
+  labs(
+    title = "Frequency of native languages",
+    x="",
+    y=""
+  )+
+  scale_y_continuous(labels = label_number(suffix = " K", scale = 1e-3))
 
 ```
 
@@ -288,22 +284,93 @@ DESCRIPTION OF THE FIGURE. WHAT DOES IT TELS US?
 
 The key pattern of association is:
 
-```{r Patterns of association, echo=FALSE, fig.align="center", fig.height=3, fig.width=4, warning=FALSE}
-chck_sp <- function( x_var , x_lab ){
-  ggplot( df , aes(x = x_var, y = score4)) +
-    geom_point(color='red',size=2,alpha=0.6) +
-    geom_smooth(method="loess" , formula = y ~ x )+
-    labs(x = x_lab, y = "Averaged values of test scores") +
-    theme_bw()
+```{r Patterns of association, echo=FALSE, message=FALSE, warning=FALSE}
+
+# Scatterplots
+f1<-ggplot(df, aes(x=Eng_start, y=correct))+
+  geom_point( alpha=0.1, color="navyblue")+
+  geom_smooth(method = "gam", color="red")+
+  facet_wrap(~natlangs, ncol = 4)+
+  theme_gyongyver()+
+  labs(
+    title = "Pattern of starting age of English learning",
+    x = "Starting age of English learning",
+    y= "English correctness"
+  )
+  
+f1  
+
+f2<-ggplot(df, aes(x=age, y=correct))+
+  geom_point( alpha=0.1, color="navyblue")+
+  geom_smooth(method = "gam", color="red")+
+  facet_wrap(~natlangs, ncol = 4)+
+  theme_gyongyver()+
+  labs(
+    title = "Pattern of age in English correctness",
+    x = "Age",
+    y= "English correctness"
+  )
+f2
+
+
+# Lowess
+filter(df, df$natlangs=="Dutch") %>% 
+ggplot()+
+  geom_smooth(aes(x=Eng_start, y=correct), color="red", method = "gam")+
+  geom_point(aes(x=Eng_start, y=correct), alpha= 0.2, color="navyblue")+
+  theme_gyongyver()
+  
+
+# Correlation matrix
+matrix<-cor(df[,c(1,4,6,8,9,10,11)])
+colnames(matrix)<-c("Age", "English starting age","Native English","Primary English", "Psychiatric", "English correctness",
+                    "Log of English correctness")
+rownames(matrix)<-c("Age", "English starting age","Native English","Primary English", "Psychiatric", "English correctness",
+                    "Log of English correctness")
+
+corrplot(matrix,addCoef.col = 'black',tl.col = "black",
+         tl.cex = 0.9, tl.srt=45,number.cex=0.8, number.digits=2)
+
+```
+
+
+```{r Binscatter, echo=FALSE, message=FALSE, warning=FALSE}
+
+StatBinscatter <- ggplot2::ggproto(
+  "StatBinscatter", 
+  Stat,
+  compute_group = function(data, scales, bins = 10) {
+    bins     <- min(floor(nrow(data)/10), bins)
+    x_bin    <- ggplot2::cut_number(data$x + 1e-12*runif(nrow(data)), bins)
+    x_means  <- stats::ave(data$x, x_bin, FUN = mean)
+    y_means  <- stats::ave(data$y, x_bin, FUN = mean)
+    y_se     <- stats::ave(data$y, x_bin, FUN = sd)
+    y_obs    <- stats::ave(data$y, x_bin, FUN = length)
+    result   <- data.frame(x    = x_means, 
+                           y    = y_means, 
+                           ymax = y_means + 1.96*y_se/sqrt(y_obs),
+                           ymin = y_means - 1.96*y_se/sqrt(y_obs))
+    result   <- unique(result)
+    return(result)
+  },
+  required_aes = c("x", "y")
+)
+
+stat_binscatter <- function(mapping = NULL, data = NULL, geom = "point",
+                            position = "identity", na.rm = FALSE, show.legend = NA, 
+                            inherit.aes = TRUE, ...) {
+  ggplot2::layer(
+    stat = StatBinscatter, data = data, mapping = mapping, geom = geom, 
+    position = position, show.legend = show.legend, inherit.aes = inherit.aes,
+    params = list(na.rm = na.rm, ...)
+    )
 }
 
-ggplot(df)+
-  geom_point(aes(x=age, y=correct))+
+ggplot(df, aes(x=Eng_start, y=elogit))+
+  geom_point(alpha=.05, color="navyblue")+
+  stat_binscatter(color="red",bins=60,geom = "pointrange")+
   theme_gyongyver()
-
-# Our main interest: student-to-teacher ratio:
-chck_sp(df$stratio,'Student-to-teacher ratio')
-
+  
 ```
 
 How will you include this in your model?
@@ -313,31 +380,32 @@ Short description on the other variables: 2-10 sentence depends on the amount of
 ## Models
 
 
-```{r, echo = FALSE }
+```{r Models, message=FALSE, warning=FALSE, include=FALSE}
 
 # reg1: NO control, simple linear regression
-reg1 <- feols( correct ~ age + gender + natlangs+ education + nat_Eng, data = df , vcov = 'hetero' )
+reg1 <- feols( correct ~ natlangs, data = df , vcov = 'hetero' )
 summary(reg1)
-reg1
-# reg2: NO controls, use piecewise linear spline(P.L.S) with a knot at 18
-reg2 <- feols( score4 ~ lspline( stratio , 18 ) , data = df , vcov = 'hetero' )
+
+# reg2: With controls
+reg2<- feols( correct ~ age + gender + natlangs+ education +psychiatric , data = df , vcov = 'hetero' )
+summary(reg2)
 
 # reg3: control for english learners dummy (english_d) only. 
 #   Is your parameter different? Is it a confounder?
-df <- df %>% mutate( english_d = 1*(english>1))
-reg3 <- feols( score4 ~ lspline( stratio , 18 ) + english_d, data = df , vcov = 'hetero' )
 
+reg3 <-feols( correct ~ age + gender + natlangs+ education +psychiatric+ Eng_start , data = df , vcov = 'hetero' )
+summary(reg3)
 ##
 # reg4: reg3 + Schools' special students measures (lunch with P.L.S, knot: 15; and special)
-reg4 <- feols( score4 ~ lspline( stratio , 18 ) + english_d 
-                   + lspline(lunch,15) + special , data = df , vcov = 'hetero' )
-
+reg4 <- feols( correct ~ age + gender + natlangs+ education + psychiatric +lspline(Eng_start,2) , data = df , vcov = 'hetero' )
+summary(reg4)
 #
 # reg5: reg4 + salary with P.L.S, knots at 35 and 40, exptot, log of income and scratio
-reg5 <- feols( score4 ~ lspline( stratio , 18 ) + english_d
-                   + lspline(lunch,15) + special 
-                   + lspline(salary,c(35,40)) + exptot 
-                   + log( income ) + scratio , data = df , vcov = 'hetero' )
+reg5 <- feols( correct ~ age + gender + natlangs+ education + psychiatric +lspline(Eng_start,1) ,
+               data = df , vcov = 'hetero' )
+
+
+etable(reg1,reg2,reg3,reg4,reg5)
 
 # Naming the coefficients for pretty output
 alpha  <- round( reg5$coeftable[1,1] , 2 )
@@ -362,37 +430,63 @@ I have the t-statistic as `r round( reg5$coeftable[2,3] , 2 )` and the p-value a
 
 We compare multiple models to learn about the stability of the parameters. Bla-bla:
 
-```{r, Regression table, echo = FALSE }
+```{r Regtable, echo=FALSE, message=FALSE, warning=FALSE}
 ##
 # Summarize our findings:
 varname_report <- c("(Intercept)" = "Intercept",
-                   "stratio" = "student/teacher",
-                   "lspline(stratio,18)1" = "student/teacher (<18)",
-                   "lspline(stratio,18)2" = "student/teacher (>=18)",
-                   "english_d" = "english_dummy")
-groupConf <- list("English" = c("english"),
-                  "Lunch" = c("lunch"),
-              "Other Special" = c("special"),
-              "Wealth Measures" = c("exptot","income","scratio"))
-vars_omit <- c("english|lunch|special|salary|exptot|income|scratio")
+                   "nalangsDutch" = "Native Dutch",
+                   "nalangsFinnish" = "Native Finnish",
+                   "nalangsGerman" = "Native German",
+                   "nalangsHungarian" = "Native Hungarian",
+                   "nalangsPolish" = "Native Polish",
+                   "nalangsRussian" = "Native Russian",
+                   "nalangsSpanish" = "Native Spanish",
+                   "nalangsSwedish" = "Native Swedish",
+                   "nalangsTurkish" = "Native Turkish",
+                   "lspline(Eng_start,2)1" = "Starting age of English learning (<2)",
+                   "lspline(Eng_start,2)2" = "Starting age of English learning (>=2)",
+                   "age" = "Age",
+                   "gendermale" = "Male",
+                   "genderother" = "Other gender",
+                   "educationHighSchoolDegree(12-13years)" = "HighSchool Degree (12-13years ed)",
+                   "educationSomeUndergrad(highered)" = "Some Undergrad (highered)",
+                   "educationUndergraduateDegree(3-5yearshighered)" = "Undergraduate Degree (3-5years highered)",
+                   "educationSomeGraduateSchool" = "Some Graduate School",
+                   "educationGraduateDegree" = "Graduate Degree",
+                   "Eng_start" = "Starting age of English learning"
+                   
+                   )
+
 
 # Note: coefstat = 'confint' is just an example, usually you need to report se.
 style_noHeaders = style.tex(var.title = "", fixef.title = "", stats.title = " ")
 
 
-kable( etable( reg1 , reg2 , reg3 , reg4 , reg5 ,
-        title = 'Average test scores for 4th graders',
-        dict = varname_report,
-        drop = vars_omit ,
-        group = groupConf ,
-        se.below = T,
-        coefstat = 'se',
-        fitstat = c('n','r2'),
-        se.row = F,
-        depvar = F ) , 
-        col.names = c('(1)','(2)','(3)','(4)','(5)'),
-       "latex", booktabs = TRUE,  position = "H",
-       caption = 'Models to uncover relation between test score and student to teacher ratio') %>% kable_styling(latex_options = c("hold_position","scale_down"))
+# kable( etable( reg1 , reg2 , reg3 , reg4 , reg5 ,
+#         title = 'Average test scores for 4th graders',
+#         dict = varname_report,
+#         drop = vars_omit ,
+#         group = groupConf ,
+#         se.below = T,
+#         coefstat = 'se',
+#         fitstat = c('n','r2'),
+#         se.row = F,
+#         depvar = F ) , 
+#         col.names = c('(1)','(2)','(3)','(4)','(5)'),
+#        "latex", booktabs = TRUE,  position = "H",
+#        caption = 'Models to uncover relation between test score and student to teacher ratio') %>% kable_styling(latex_options = c("hold_position","scale_down"))
+
+msummary(list("LPM"=reg1, "Logit"=reg2,"Logit marginal"=reg3,
+              "Probit"=reg4,"Probit marginal"=reg5),
+         title = "Estimated models",
+         fmt="%.3f",
+         statistic = "std.error",
+         gof_omit = 'DF|Deviance|F|R2 Adj.|AIC|PseudoR2',
+         stars=c('**' = .05, '***' = .01),
+         coef_rename = varname_report,
+         notes = ''
+) %>% kable_styling(latex_options = c("HOLD_position","scale_down"),
+                    font_size = 11)
 
 
 ```
