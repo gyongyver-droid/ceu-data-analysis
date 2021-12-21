@@ -2,8 +2,8 @@
 # The full data is from OSF data storage https://osf.io/pyb8s/ 
 rm(list=ls())
 library(dplyr)
-#dt <-read.csv('https://osf.io/g72pq/download',encoding = "UTF-8")
-dt <-read.csv('data.csv', encoding = "UTF-8")
+dt <-read.csv('https://osf.io/g72pq/download',encoding = "UTF-8")
+#dt <-read.csv('data.csv', encoding = "UTF-8")
 dt <- dt[c(2:31,127,128)] # ignore individual question scores, we are interested in the overall correctness
 
 summary(dt)
