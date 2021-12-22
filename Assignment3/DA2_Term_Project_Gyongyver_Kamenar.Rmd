@@ -41,9 +41,9 @@ library(bookdown)
 
 # Get the data
 
-df <-read.csv('https://raw.githubusercontent.com/gyongyver-droid/ceu-data-analysis/master/Assignment3/clean_data.csv', encoding = "UTF-8")
+#df <-read.csv('https://raw.githubusercontent.com/gyongyver-droid/ceu-data-analysis/master/Assignment3/clean_data.csv', encoding = "UTF-8")
 
-#df<-read.csv('clean_data.csv', encoding = "UTF-8")
+df<-read.csv('clean_data.csv', encoding = "UTF-8")
 
 ```
 
@@ -85,15 +85,19 @@ and no more than 1 year in total) (categorical)
 -   \textbf{Dyslexia} : subject reported difficulty with reading (binary)
 
 Reason: there was no variation in this variable (noone with dyslexia)
+
 -   \textbf{Live with English} : subject lives with any native speakers (binary) 
 
 Reason: majority of the data were NULL values indicating missing observation and I cannot be sure what it means
+
 -   \textbf{Countries} : countries subject lived in (categorical) 
 
 Reason: too much distinct categories (thousands) with just few subjects, moreover most subject lived in 2 or more countries
+
 -  \textbf{Current country}: country currently lived in (categorical) 
 
 Reason: too much distinct values (hundreds) and NAs
+
 -  \textbf{English country years}: number of years living in English speaking countries 
 
 Reason: most observations are missing and a similar feature is captured by Language status variable
@@ -125,7 +129,7 @@ df %>%  group_by(Eng_little) %>% count() %>% arrange(desc(n))
 df %>%  group_by(correct) %>% count() %>% arrange(desc(n))
 
 
-## Set base categories
+## Set base categories and variable type
 
 df <-df %>% mutate(
   age = as.numeric(age),
@@ -141,8 +145,6 @@ df <-df %>% mutate(
   
 )
 
-#levels
-levels(df$natlangs)
 
 #Filter age 
 df <- filter(df, df$age>=14)
@@ -166,34 +168,38 @@ Age is also a relevant factor in English correctness, so subjects at least 14 ye
 
 ### Descriptive statistics
 
-Please see below the descriptive statistics of the numerical variables and the correlation matrix.
+Please see below the descriptive statistics of the numerical variables.
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
 # Sample selection
 df<- df %>% select( age, gender, education,
                      Eng_start, natlangs, nat_Eng, primelangs, prime_Eng,
-                     psychiatric , correct, elogit, Eng_little,learning, ) %>% drop_na()
+                     psychiatric , correct, elogit, Eng_little,learning ) %>% drop_na()
 
 P95 <- function(x){quantile(x,0.95,na.rm=T)}
 P05 <- function(x){quantile(x,0.05,na.rm=T)}
 datasummary( (`Age` = age ) +  
              (`Starting age of English learning` = Eng_start ) + 
              (`Psychiatric disorder` = psychiatric) + 
-             (`Critical items correct (%)` = correct) +
+             (`English correctness` = correct) +
                (`Years of English learning` = learning) +
-             (`Log(correct)` = elogit)  ~
+             (`Log(English correctness)` = elogit)  ~
              Mean + Median + SD + Min + Max + P05 + P25 + P75 + P95 , 
              data = df ,
              title = 'Descriptive statistics') %>% 
       kable_styling(latex_options = c("HOLD_position","scale_down"), font_size = 11)
 ```
 
-The number of observations is `r sum(!is.na(df$correct))` for all of our key variables.
+The number of observations is `r length(!is.na(df$correct))` for all of our key variables.
+The age of subjects is filtered to be at least 14 years, because below that they might not able to learn a language properly. There were some errors in the English correctness variable, because some native English people had correctness below 0.5. There is hardly and correctness score below 0.5 even for non-native English people, so these English people most probably did not make the effort to properly do the quize and that is why I removed them.
 
-DESCRIPTION OF THE SUMMARY STATS: WHAT CAN WE LEARN FROM THEM?
+We can see, that the SD of English correctness variable is really small, the mean is `r round(mean(df$correct),2)` and the median is `r round(median(df$correct),2)` so the distribution is left skewed. See the distributions Figure \@ref(fig:Distributions) .
 
-As the focus is the price difference, the next Figure shows the histogram for this variable.
-```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.cap="Correlation matrix", fig.height=3, fig.width=5, fig.pos="H"}
+### Exploratory data analysis 
+
+FIrstly, I checked the correlation between the non-categorical variables, see the correlation matrix in Figure \@ref(fig:corrplot). Native English and primary English variable are obviously highly correlated. The English starting age has strong negative correlation with native English and primary English (`r round(cor(df$nat_Eng, df$Eng_start),2)`) and also with English correctness and years of English learning (because the latter is age - English starting age). Age and years of English learning have positive correlation with English correctness. Psychiatric disorder is not really correalted with anything. In the modelling phase, I will check this matrix to decide which variable to add or not to add.
+
+```{r corrplot, echo=FALSE, message=FALSE, warning=FALSE, fig.cap="Correlation matrix", fig.height=3}
 
 # Correlation matrix
 matrix<-cor(df[,c(1,4,6,8,9,10,11,13)])
@@ -203,7 +209,7 @@ rownames(matrix)<-c("Age", "English starting age","Native English","Primary Engl
                     "Log of English correctness","Years of English learning")
 
 corrplot(matrix,addCoef.col = 'grey50',tl.col = "black",
-         tl.cex = 0.7, tl.srt=45,number.cex=0.7, number.digits=2)
+         tl.cex = 0.7, tl.srt=45,number.cex=0.6, number.digits=2)
 
 ```
 
@@ -250,7 +256,7 @@ theme_gyongyver<-function(base_size=11){
 
 
 
-```{r Distributions, warning=FALSE, include=FALSE}
+```{r Distribution, warning=FALSE, include=FALSE}
 # correct
 p1 <- ggplot( df , aes(x = correct)) +
   geom_histogram(  fill='navyblue', color = 'white' ) +
@@ -306,8 +312,9 @@ distribution_figs <- ggarrange(p1, p2,p3, p4,
 #plot(df$natlangs, df$correct)
 ```
 
+As the focus is English correctness for different native languages, the Figure \@ref(fig:Boxplot) shows the boxplot for each native language. The differences in English correctness are visible on the boxplot.
 
-```{r Boxplot, message=FALSE,warning=FALSE, fig.cap="Boxplot of English correctness", fig.width=7, fig.height=3 }
+```{r Boxplot, echo=FALSE, fig.cap="Boxplot of English correctness", fig.height=3, fig.width=7, message=FALSE, warning=FALSE, fig.pos="H"}
 ggplot(df,aes(x=natlangs, y=correct))+
   geom_boxplot(fill="steelblue4", color="black")+
   geom_violin(width=3, alpha=0.1, fill="skyblue2")+
@@ -322,9 +329,7 @@ ggplot(df,aes(x=natlangs, y=correct))+
 
 ```
 
-DESCRIPTION OF THE FIGURE. WHAT DOES IT TELS US?
 
-### Exploratory data analysis 
 
 The key pattern of association is:
 
@@ -416,7 +421,7 @@ Short description on the other variables: 2-10 sentence depends on the amount of
 ```{r Models, message=FALSE, warning=FALSE, include=FALSE}
 
 # reg1: NO control, simple linear regression
-reg1 <- feols( correct ~ natlangs, data = df , vcov = 'hetero' )
+reg1 <- feols( correct ~ natlangs, data = foreign , vcov = 'hetero' )
 summary(reg1)
 
 # reg2: With controls
@@ -463,8 +468,8 @@ where $Z$ are standing for the controls, which includes controlling for english 
 - when the student to teacher is one unit larger, with the value above or equal to 18, we see students to have on average $`r abs(b2)`$ smaller grades.
 
 However, based on the heteroskedastic robust standard errors, these results are statistically non different from zero. To show that, I have run a two-sided hypothesis test:
-$$H_0:=\beta_1 = 0$$
-$$H_A:=\beta_1 \neq 0$$
+$$H_0:=\beta_1 - \beta_2 = 0$$
+$$H_A:=\beta_1 - \beta_2 \neq 0$$
 I have the t-statistic as `r round( reg5$coeftable[2,3] , 2 )` and the p-value as `r round( reg5$coeftable[2,4] , 2 )`, which confirms my conclusion.
 
 We compare multiple models to learn about the stability of the parameters. Bla-bla:
@@ -552,7 +557,7 @@ HERE COMES WHAT WE HAVE LEARNED AND WHAT WOULD STRENGHTEN AND WEAKEN OUR ANALYSI
 
 Here comes all the results which are referenced and not essential for understanding the MAIN results.
 
-```{r echo=FALSE, fig.cap="Distributions", message=FALSE, warning=FALSE, out.height='100%', out.width='100%', fig.pos="H"}
+```{r Distributions, echo=FALSE, fig.cap="Distributions", message=FALSE, warning=FALSE, out.height='100%', out.width='100%', fig.pos="H"}
 distribution_figs
 ```
 
@@ -573,22 +578,22 @@ df %>%  group_by(natlangs) %>% count() %>% arrange(desc(n)) %>%
 
 ```
 
-```{r echo=FALSE, message=TRUE, warning=TRUE, fig.cap="Binned Scatterplots"}
+```{r echo=FALSE, fig.cap="Binned, message=TRUE, warning=TRUE}
 
 ggarrange(bs1)
 
 ```
 
-```{r fig.cap="Smoothed patter", warning=FALSE,message=FALSE}
-
+```{r echo=FALSE, fig.cap="Smoothed pattern", message=FALSE, warning=FALSE}
+# Smoothed pattern in appendix
 f1
+
 f2
-
-
 
 ```
 
 
+\newpage
 ## Bibliography
 
 Hartshorne, J. K., Tenenbaum, J. B., & Pinker, S. (2018). A critical period for second language acquisition: Evidence from 2/3 million English speakers. Cognition, 177, 263-277.
