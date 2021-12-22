@@ -1,7 +1,7 @@
 ---
 title: "Data Analysis 2 Term Project"
 author: "Gyongyver Kamenar (2103380)"
-geometry: "left=2cm,right=2cm,top=2cm,bottom=2cm"
+geometry: "left=2cm,right=2cm,top=1cm,bottom=2cm"
 output: 
   bookdown::pdf_document2:
     fig_caption: yes
@@ -41,9 +41,9 @@ library(bookdown)
 
 # Get the data
 
-#df <-read.csv('https://raw.githubusercontent.com/gyongyver-droid/ceu-data-analysis/master/Assignment3/clean_data.csv', encoding = "UTF-8")
+all_df <-read.csv('https://raw.githubusercontent.com/gyongyver-droid/ceu-data-analysis/master/Assignment3/clean_data.csv', encoding = "UTF-8")
 
-df<-read.csv('clean_data.csv', encoding = "UTF-8")
+#all_df<-read.csv('clean_data.csv', encoding = "UTF-8")
 
 ```
 
@@ -55,9 +55,9 @@ This paper analyze the differences of English correctness between people with se
 
 ### Origin of the data
 
-The used dataset was origninally collected by Hartshorne et. al. (2018) who studied the critical period for second language acquisition. He collected data from 669,498 respondents through online English quizes. The ca. 10 minute-long English grammar quize was deliberately developed to enabled the researcher to measure the respondent's syntactic English knowledge and also provided several demographic variables. The critical items of the quize are the diagnostics of proficiency and there were additional items to distinguish between dialects. In my  analysis I used the percentage of correct critical items as a proxy of English correctness.
+The used dataset was originally collected by Hartshorne et. al. (2018) who studied the critical period for second language acquisition. He collected data from 669,498 respondents through online English quizes. The ca. 10 minute-long English grammar quiz was deliberately developed to enabled the researcher to measure the respondent's syntactic English knowledge and also provided several demographic variables. The critical items of the quiz are the diagnostics of proficiency and there were additional items to distinguish between dialects. In my  analysis I used the percentage of correct critical items as a proxy of English correctness.
 
--  **English correctness** : percentage of critical quize items correct
+-  **English correctness** : percentage of critical quiz items correct
 
 Further information  about the data is available (here)[<https://osf.io/pyb8s/>] and in Hartshorne et. al. (2018).
 
@@ -71,7 +71,7 @@ In this subsection I list the available variables in the dataset that I found re
 -   \textbf{Native English} : English is the subjects native language (binary)
 -   \textbf{Primary language} : subject's primary language(s) now (categorical)
 -   \textbf{Primary English} : subject's primary language is English (binary)
--   \textbf{Psychiatric} : subject repoted any psychiatric disorders (binary)
+-   \textbf{Psychiatric} : subject reported any psychiatric disorders (binary)
 -   \textbf{Starting age of English learning} : age at start of English learning (numerical)
 -   \textbf{Language status} : either monoeng (native speaker of English only), bileng (native speaker of English + at least one other lang), immersion learner(spending at least 90% of their life since age of first exposure in an
 English-speaking country), or non-immersion learner(spent at most 10% of post-exposure life in an English-speaking country
@@ -84,7 +84,7 @@ and no more than 1 year in total) (categorical)
 
 -   \textbf{Dyslexia} : subject reported difficulty with reading (binary)
 
-Reason: there was no variation in this variable (noone with dyslexia)
+Reason: there was no variation in this variable (no one with dyslexia)
 
 -   \textbf{Live with English} : subject lives with any native speakers (binary) 
 
@@ -103,6 +103,10 @@ Reason: too much distinct values (hundreds) and NAs
 Reason: most observations are missing and a similar feature is captured by Language status variable
 
 ```{r Data cleaning and mungling, message=FALSE, warning=FALSE, include=FALSE}
+# Filter out English native
+# Filter fore just non-english
+df<-filter(all_df,all_df$nat_Eng==0)
+
 # Ckack the variables
 summary(df)
 
@@ -140,8 +144,7 @@ df <-df %>% mutate(
   Eng_little = as.factor(Eng_little),
   learning = age - Eng_start,
   education = relevel(education,ref = "Haven't Finished High School (less than 13 years ed)"),
-  natlangs = relevel(natlangs, ref = "English"),
-  Eng_little = relevel(Eng_little,ref = "monoeng")
+  natlangs = relevel(natlangs, ref = "Turkish")
   
 )
 
@@ -149,12 +152,6 @@ df <-df %>% mutate(
 #Filter age 
 df <- filter(df, df$age>=14)
 
-# Filter error in English correctness
-df %>%  group_by(correct) %>% count() %>% arrange(correct)
-df <- filter(df, !(df$correct<0.5 & df$natlangs=="English"))
-
-# Datatable with just non-english
-foreign<-filter(df,df$nat_Eng==0)
 
 ```
 
@@ -162,7 +159,7 @@ foreign<-filter(df,df$nat_Eng==0)
 
 The data includes bilinguals and immersion learners as well, which is beyond the scope of my research question. The study's interests are subject with 1 native language (not bilingual) and in case it is not English, we want to investigate subject who are non-immersion learners (spent at most 10% of post-exposure life in an English-speaking country and no more than 1 year in total).  Thus the language status is filtered  for monoenglish or non-immersion.
 
-Furthermore, I analyze subject with 1 native language and there are several different categories in the dataset. I decided to analyze just the top 10 native languages based on the number of subject in the dataset, namely; English, Finnish, Turkish, German, Hungarian,Russian, Dutch, Polish, Swedish and Spanish in the respective order. Even from the least frequent native language Spanish there were more then 9200 subjects in the filtered dataset.
+Furthermore, I analyze subject with 1 native language and there are several different categories in the dataset. I decided to analyze just the top 9  native languages beside English, based on the number of subject in the dataset (top 1 is English), namely; Finnish, Turkish, German, Hungarian,Russian, Dutch, Polish, Swedish and Spanish in the respective order. Even from the least frequent native language Spanish there were more then 9200 subjects in the filtered dataset.
 
 Age is also a relevant factor in English correctness, so subjects at least 14 years old to make they are able to learn a language.
 
@@ -191,21 +188,21 @@ datasummary( (`Age` = age ) +
 ```
 
 The number of observations is `r length(!is.na(df$correct))` for all of our key variables.
-The age of subjects is filtered to be at least 14 years, because below that they might not able to learn a language properly. There were some errors in the English correctness variable, because some native English people had correctness below 0.5. There is hardly and correctness score below 0.5 even for non-native English people, so these English people most probably did not make the effort to properly do the quize and that is why I removed them.
+The age of subjects is filtered to be at least 14 years, because below that they might not able to learn a language properly.
 
-We can see, that the SD of English correctness variable is really small, the mean is `r round(mean(df$correct),2)` and the median is `r round(median(df$correct),2)` so the distribution is left skewed. See the distributions Figure \@ref(fig:Distributions) .
+We can see, that the SD of English correctness variable is really small, the mean is `r round(mean(df$correct),2)` and the median is `r round(median(df$correct),2)` so the distribution is left skewed. See the distributions Figure \@ref(fig:Distributions) . It might worth to use the log of English correctness, however it complicates the interpretation of the coefficients because that the correctness is already measured in percentage. 
 
 ### Exploratory data analysis 
 
-FIrstly, I checked the correlation between the non-categorical variables, see the correlation matrix in Figure \@ref(fig:corrplot). Native English and primary English variable are obviously highly correlated. The English starting age has strong negative correlation with native English and primary English (`r round(cor(df$nat_Eng, df$Eng_start),2)`) and also with English correctness and years of English learning (because the latter is age - English starting age). Age and years of English learning have positive correlation with English correctness. Psychiatric disorder is not really correalted with anything. In the modelling phase, I will check this matrix to decide which variable to add or not to add.
+FIrstly, I checked the correlation between the non-categorical variables, see the correlation matrix in Figure \@ref(fig:corrplot). The English starting age has negative correlation  with English correctness `r round(cor(df$Eng_start,df$correct),2)` and years of English learning `r round(cor(df$Eng_start,df$learning),2)` (because the latter is age - English starting age). Age and years of English learning have positive correlation with English correctness. Psychiatric disorder is not really correlated with anything. In the modelling phase, I will check this matrix to decide which variable to add or not to add.
 
 ```{r corrplot, echo=FALSE, message=FALSE, warning=FALSE, fig.cap="Correlation matrix", fig.height=3}
 
 # Correlation matrix
-matrix<-cor(df[,c(1,4,6,8,9,10,11,13)])
-colnames(matrix)<-c("Age", "English starting age","Native English","Primary English", "Psychiatric", "English correctness",
+matrix<-cor(df[,c(1,4,9,10,11,13)])
+colnames(matrix)<-c("Age", "English starting age", "Psychiatric", "English correctness",
                     "Log of English correctness","Years of English learning")
-rownames(matrix)<-c("Age", "English starting age","Native English","Primary English", "Psychiatric", "English correctness",
+rownames(matrix)<-c("Age", "English starting age", "Psychiatric", "English correctness",
                     "Log of English correctness","Years of English learning")
 
 corrplot(matrix,addCoef.col = 'grey50',tl.col = "black",
@@ -314,24 +311,8 @@ distribution_figs <- ggarrange(p1, p2,p3, p4,
 
 As the focus is English correctness for different native languages, the Figure \@ref(fig:Boxplot) shows the boxplot for each native language. The differences in English correctness are visible on the boxplot.
 
-```{r Boxplot, echo=FALSE, fig.cap="Boxplot of English correctness", fig.height=3, fig.width=7, message=FALSE, warning=FALSE, fig.pos="H"}
-ggplot(df,aes(x=natlangs, y=correct))+
-  geom_boxplot(fill="steelblue4", color="black")+
-  geom_violin(width=3, alpha=0.1, fill="skyblue2")+
-  theme_gyongyver()+
-  theme(axis.text.x = element_text(size = 9))+
-  labs(
-    title = "Boxplot of English correctness for native languages",
-    x="",
-    y= "English correctness"
-  )+
-  scale_y_continuous(labels = scales::percent)
 
-```
-
-
-
-The key pattern of association is:
+I also checked, whether there is a pattern between starting age of English learning and English correctness, as well as between age and English correctness. I plotted a non-parametric regregression (smoothed method) for all native languages as you can see on Figure  \@ref(fig:startagepattern) and Figure  \@ref(fig:agepattern) . These can help me decide, whether to add any splines of interaction terms in the regressions. The pattern og age in English correctness seems pretty constant for all native languages, it some cases it has a slight downward slope but no knit points. However, the pattern of strating age of English learning shows steeper downward slope in the non-parametric regressions and in some cases the pattern change at around year 10. I also created a binned scatterplot for starting age of English learning on Figure  \@ref(fig:binnedscatter) and the points change pattern exactly at 10 years. Probably adding a spline there can improve the model. 
 
 ```{r Smoothed scatterplots, message=FALSE, warning=FALSE, include=FALSE}
 
@@ -339,10 +320,10 @@ The key pattern of association is:
 f1<-ggplot(df, aes(x=Eng_start, y=correct))+
   geom_point( alpha=0.01, color="navyblue")+
   geom_smooth(method = "gam", color="red")+
-  facet_wrap(~natlangs, ncol = 4)+
+  facet_wrap(~natlangs, ncol = 3)+
   theme_gyongyver()+
   labs(
-    title = "Pattern of starting age of English learning",
+    title = "Pattern of starting age of English learning in English correctness",
     x = "Starting age of English learning",
     y= "English correctness"
   )
@@ -351,7 +332,7 @@ f1<-ggplot(df, aes(x=Eng_start, y=correct))+
 f2<-ggplot(df, aes(x=age, y=correct))+
   geom_point( alpha=0.01, color="navyblue")+
   geom_smooth(method = "gam", color="red")+
-  facet_wrap(~natlangs, ncol = 4)+
+  facet_wrap(~natlangs, ncol = 3)+
   theme_gyongyver()+
   labs(
     title = "Pattern of age in English correctness",
@@ -396,7 +377,7 @@ stat_binscatter <- function(mapping = NULL, data = NULL, geom = "point",
     )
 }
 
-bs1<-ggplot(foreign, aes(x=Eng_start, y=elogit))+
+bs1<-ggplot(df, aes(x=Eng_start, y=elogit))+
   geom_point(alpha=.01, color="navyblue")+
   stat_binscatter(color="red",bins=30,geom = "pointrange")+
   labs(
@@ -411,72 +392,147 @@ bs1<-ggplot(foreign, aes(x=Eng_start, y=elogit))+
   
 ```
 
-How will you include this in your model?
 
-Short description on the other variables: 2-10 sentence depends on the amount of variables you have. You should reference your decisions on the graphs/analysis which are located in the appendix.
 
 ## Models
 
-
+ 
 ```{r Models, message=FALSE, warning=FALSE, include=FALSE}
 
 # reg1: NO control, simple linear regression
-reg1 <- feols( correct ~ natlangs, data = foreign , vcov = 'hetero' )
+reg1 <- feols( correct ~ natlangs, data = df , vcov = 'hetero' )
 summary(reg1)
 
 # reg2: With controls
-reg2<- feols( correct ~ age + gender + natlangs+ education +psychiatric+ Eng_start , data = df , vcov = 'hetero' )
+reg2<- feols( correct ~ age + gender + natlangs+ education +psychiatric+ learning , data = df , vcov = 'hetero' )
 summary(reg2)
 
 # reg3: additional control for starting age of English learning
 #   Is your parameter different? Is it a confounder?
 
-reg3 <-feols( correct ~ age + gender + natlangs+ education +psychiatric +learning  , data = df , vcov = 'hetero' )
+reg3 <-feols( correct ~ age + gender + natlangs+ education +psychiatric +Eng_start  , data = df , vcov = 'hetero' )
 summary(reg3)
 ##
 # reg4: reg3 + slines of starting age of English learning
-reg4 <- feols( correct ~ age + gender + natlangs+ education + psychiatric +lspline(Eng_start,2) , data = df , vcov = 'hetero' )
+reg4 <- feols( correct ~ age + gender + natlangs+ education + psychiatric +lspline(Eng_start,10) , data = df , vcov = 'hetero' )
 summary(reg4)
 #
-# reg5: reg4 + salary with P.L.S, knots at 35 and 40, exptot, log of income and scratio
-reg5 <- feols( correct ~ age + gender + natlangs+ education + psychiatric +lspline(Eng_start,1) ,
-               data = df , vcov = 'hetero' )
-reg5
+# reg5: reg4 + knits at 10 and 20 as well
+reg5 <- feols( correct ~ age + gender + natlangs+ education + psychiatric +lspline(Eng_start,c(10,20)) , data = df , vcov = 'hetero' )
+summary(reg5)
 
 etable(reg1,reg2,reg3,reg4,reg5)
 
-# Test difference
-library(car)
-linearHypothesis(reg5, "natlangsPolish - natlangsHungarian = 0")
-linearHypothesis(reg4,"lspline(Eng_start, 2)1 - lspline(Eng_start, 2)2 = 0")
-linearHypothesis(reg5, "gendermale - genderother = 0")
 # Naming the coefficients for pretty output
+reg5$coeftable
 alpha  <- round( reg5$coeftable[1,1] , 2 )
-b1 <- round( reg5$coeftable[2,1] , 2 )
-b2 <- round( reg5$coeftable[3,1] , 2 )
+dut <- round( reg5$coeftable[5,1] , 3 )
+fin <- round( reg5$coeftable[6,1] , 3 )
+ger <- round( reg5$coeftable[7,1] , 3 )
+hun <- round( reg5$coeftable[8,1] , 3 )
+pol <- round( reg5$coeftable[9,1] , 3 )
+rus <- round( reg5$coeftable[10,1] , 3 )
+spa <- round( reg5$coeftable[11,1] , 3 )
+swe <- round( reg5$coeftable[12,1] , 3 )
+
 
 ```
 
-My preferred model is:
+Firstly, I estimeted a regression just with the native language categories and it already explained more than nearly 20% of the variance of log(English correctness). Then in the second model I added the relevant explanatory variables detailed before, so I added age, education, gender, psychiatric disorder and years of English learning to control for these variables. Because years of English learning highly correlates with age (it is calculated from that) in the third model is used the starting age of English learning to reduce multicollinearity issue. 
 
-score = $`r alpha`$ $`r b1`$ $( student/teacher < 18)$ $`r b2`$ $( student/teacher \geq 18) + \delta Z$
+In the fourth regression I added splines with a knot point at 10 years as suggested by the binned scatterplot in Figure  \@ref(fig:binnedscatter) . Finally, in the fifth model I also added a knot point at 20 years also based on Figure \@ref(fig:binnedscatter) and Figure \@ref(fig:startagepattern) .  I was thinking about possible interaction of native language with a numerical variable based on the smoothed regressions, however, it would probably result overfitting. For example the pattern of Finnish Polish and Dutch cases on Figure \@ref(fig:startagepattern) . 
+See my estimation results in Table \@ref(tab:Regtable) . 
 
-where $Z$ are standing for the controls, which includes controlling for english language, lunch, other special characteristics and wealth measures. From this model we can infer:
+### Results
 
-- when every covariates are zero, students expected to have grade score of $`r alpha`$
-- when the student to teacher is one unit larger, but below the value of 18, we see students to have on average $`r abs(b1)`$ smaller grades.
-- when the student to teacher is one unit larger, with the value above or equal to 18, we see students to have on average $`r abs(b2)`$ smaller grades.
+As you can see, all of the variables are significant in all models, except the Other gender probably due to it's low number of observations.  
+Based on the coefficienty, reasonability, Bayesian Information Criteria and Log Likelihood,  my preferred model is the fifth :
 
-However, based on the heteroskedastic robust standard errors, these results are statistically non different from zero. To show that, I have run a two-sided hypothesis test:
-$$H_0:=\beta_1 - \beta_2 = 0$$
-$$H_A:=\beta_1 - \beta_2 \neq 0$$
-I have the t-statistic as `r round( reg5$coeftable[2,3] , 2 )` and the p-value as `r round( reg5$coeftable[2,4] , 2 )`, which confirms my conclusion.
+English correctness = $`r alpha`$ + $`r dut`$ $Native  Dutch$ + $`r fin`$ $Native Finnish$ + $`r ger`$ $Native German +  ...$ + $\delta Z$
 
-We compare multiple models to learn about the stability of the parameters. Bla-bla:
+where $Z$ are standing for the controls, which includes controlling for age, gender, education and starting age of English learning. The base category of the native language is Turkish. From this model we can infer:
+
+- when every covariates are zero, people expected to have English correctness of $`r alpha`$ (so it's the base category, Turkish people)
+- when a subject's native language is Dutch, she/he has on average $`r dut`$  higher English correctness (meaning $`r dut*100`$  %)  compared to the base Turkish, controlling for the other variables. 
+- so on for the other native languages ...
+
+
+The highest language coefficient is of Native Dutch, followed by Native Swedish, German an Finnish. 
+I have the t-statistic as `r round( reg5$coeftable[5,3] , 2 )` and the p-value as `r round( reg5$coeftable[5,4] , 3 )` in case of Native Dutch, which confirms my conclusion.
+
+
+We know that the coefficients are statistically different from zero, so there is statistical difference compared to the base category (Turkish). However, I have to test whether the coefficients of the other native languages are different from each others. To show that, I have run a two-sided hypothesis test between all native language pairs $x$ and $y$:
+
+$$H_0:=\beta_x - \beta_y = 0$$
+$$H_A:=\beta_x - \beta_y \neq 0$$
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+# test difference between dummies
+library(car)
+linearHypothesis(reg5, "natlangsDutch - natlangsFinnish = 0")
+linearHypothesis(reg5, "natlangsDutch - natlangsGerman = 0")
+linearHypothesis(reg5, "natlangsDutch - natlangsHungarian = 0")
+linearHypothesis(reg5, "natlangsDutch - natlangsPolish = 0")
+linearHypothesis(reg5, "natlangsDutch - natlangsRussian = 0")
+linearHypothesis(reg5, "natlangsDutch - natlangsSpanish = 0")
+linearHypothesis(reg5, "natlangsDutch - natlangsSwedish = 0")
+linearHypothesis(reg5, "natlangsFinnish - natlangsGerman = 0")
+linearHypothesis(reg5, "natlangsFinnish - natlangsHungarian = 0")
+linearHypothesis(reg5, "natlangsFinnish - natlangsPolish = 0")
+linearHypothesis(reg5, "natlangsFinnish - natlangsRussian = 0")
+linearHypothesis(reg5, "natlangsFinnish - natlangsSpanish = 0")
+linearHypothesis(reg5, "natlangsFinnish - natlangsSwedish = 0")
+linearHypothesis(reg5, "natlangsGerman - natlangsHungarian = 0")
+linearHypothesis(reg5, "natlangsGerman - natlangsPolish = 0")
+linearHypothesis(reg5, "natlangsGerman - natlangsRussian = 0")
+linearHypothesis(reg5, "natlangsGerman - natlangsSpanish = 0")
+linearHypothesis(reg5, "natlangsGerman - natlangsSwedish = 0")
+linearHypothesis(reg5, "natlangsHungarian - natlangsPolish = 0")
+linearHypothesis(reg5, "natlangsHungarian - natlangsRussian = 0")
+linearHypothesis(reg5, "natlangsHungarian - natlangsSpanish = 0") # no difference at 1%
+linearHypothesis(reg5, "natlangsHungarian - natlangsSwedish = 0")
+linearHypothesis(reg5, "natlangsPolish - natlangsRussian = 0")
+linearHypothesis(reg5, "natlangsPolish - natlangsSpanish = 0") # no difference at 1%
+linearHypothesis(reg5, "natlangsPolish - natlangsSwedish = 0")
+linearHypothesis(reg5, "natlangsRussian - natlangsSpanish = 0")
+linearHypothesis(reg5, "natlangsRussian - natlangsSwedish = 0")
+linearHypothesis(reg5, "natlangsSpanish - natlangsSwedish = 0")
+
+
+```
+
+
+There we 2 cases when I could not reject the null hypothesis at 1% significance level. The difference between the coefficients of native Hungarian and native Spanish anf between native Polish and native Spanish are not significantly different from zero. 
+
+
+
+## Robustness check / 'Heterogeneity analysis'
+
+The t-test statistics and the p-values in the estimation table confirms that the coefficients are different from zero. Partly, this is due to the low standard errors which are due to the high number of observations and the variance in the explanatory variables. 
+
+Throughout the models, the coefficient estimates are pretty stable, in some cases the coefficient in model 1 and model 5 is the same eg. Native Hungarian is `r hun` and 0.031 in simple model. 
+
+
+The quize about English correctness  was carried out in 2014, and the world, the globalization and the popularity of English language changed since then. This suggest that the external validity is lower, then a test carried out recently. The countries and nationalities still have the most features than before, so those norms are mostly similar still now. The high number of  observation, and the clode to random selection make us infer that the data and analysis has high external validity. 
+
+The biggest drawbacks of the research is the measurement of English correctness, and a proper measure or proxy for English learning time and intensity. 
+
+
+
+## Conclusion
+
+In this study, I was interested in whether there are differences in English correctness between people with different native languages. I analyzed subject with 9 different (and not English) native languages and  controlled for other demographic variables like age, gender, education, starting age of English learning and psychological disorder. I used dummy variables to test the differences. The based category was Turkish, such people has $`r alpha`$ English correctness if every other variable is zero. I found, that there are indeed significant differences in English correctness between native languages controll for the demographic variables. In the cases, namely Hungarian - Spanish and Polish- Spanish the difference is not different from zero, however in every other case it is. The native language with the highest English correctness on average,  controlled for the demographic variables, are Dutch, Swedish and German. This finding can have implications on education systems or language learning practices as well.
+
+\newpage
+
+
+
+## Appendix
 
 ```{r Regtable, echo=FALSE, message=FALSE, warning=FALSE}
 ##
 # Summarize our findings:
+
 varname_report <- c("(Intercept)" = "Intercept",
                    "natlangsDutch" = "Native Dutch",
                    "natlangsFinnish" = "Native Finnish",
@@ -487,8 +543,11 @@ varname_report <- c("(Intercept)" = "Intercept",
                    "natlangsSpanish" = "Native Spanish",
                    "natlangsSwedish" = "Native Swedish",
                    "natlangsTurkish" = "Native Turkish",
-                   "lspline(Eng_start, 2)1" = "Starting age of English learning (<2)",
-                   "lspline(Eng_start, 2)2" = "Starting age of English learning (>=2)",
+                   "lspline(Eng_start, 10)1" = "Starting age of English learning (<10)",
+                   "lspline(Eng_start, 10)2" = "Starting age of English learning (>=10)",
+                   "lspline(Eng_start, c(10, 20))1" = "Starting age of English learning (<10)",
+                   "lspline(Eng_start, c(10, 20))2" = "Starting age of English learning (>=10 and >20)",
+                   "lspline(Eng_start, c(10, 20))3" = " Starting age of English learning (>20)",
                    "age" = "Age",
                    "gendermale" = "Male",
                    "genderother" = "Other gender",
@@ -505,26 +564,12 @@ varname_report <- c("(Intercept)" = "Intercept",
                    )
 
 
-# Note: coefstat = 'confint' is just an example, usually you need to report se.
-style_noHeaders = style.tex(var.title = "", fixef.title = "", stats.title = " ")
+#style_noHeaders = style.tex(var.title = "", fixef.title = "", stats.title = " ")
 
 
-# kable( etable( reg1 , reg2 , reg3 , reg4 , reg5 ,
-#         title = 'Average test scores for 4th graders',
-#         dict = varname_report,
-#         drop = vars_omit ,
-#         group = groupConf ,
-#         se.below = T,
-#         coefstat = 'se',
-#         fitstat = c('n','r2'),
-#         se.row = F,
-#         depvar = F ) , 
-#         col.names = c('(1)','(2)','(3)','(4)','(5)'),
-#        "latex", booktabs = TRUE,  position = "H",
-#        caption = 'Models to uncover relation between test score and student to teacher ratio') %>% kable_styling(latex_options = c("hold_position","scale_down"))
 
 msummary(list("Simple"=reg1, "Multiple"=reg2,"Multiple with starting age"=reg3,
-              "Splines"=reg4,"Splines"=reg5),
+              "Splines"=reg4,"Two knot splines"=reg5),
          title = "Estimated models",
          fmt="%.3f",
          statistic = "std.error",
@@ -541,22 +586,6 @@ msummary(list("Simple"=reg1, "Multiple"=reg2,"Multiple with starting age"=reg3,
 
 
 
-
-## Robustness check / 'Heterogeneity analysis'
-
-Task: calculate and report t-tests for each countries. 
-
-
-
-## Conclusion
-
-HERE COMES WHAT WE HAVE LEARNED AND WHAT WOULD STRENGHTEN AND WEAKEN OUR ANALYSIS.
-
-\newpage 
-## Appendix
-
-Here comes all the results which are referenced and not essential for understanding the MAIN results.
-
 ```{r Distributions, echo=FALSE, fig.cap="Distributions", message=FALSE, warning=FALSE, out.height='100%', out.width='100%', fig.pos="H"}
 distribution_figs
 ```
@@ -564,7 +593,7 @@ distribution_figs
 ```{r echo=FALSE, fig.cap="Frequency of native languages", message=FALSE, warning=FALSE}
 # frequency of native languages
 df %>%  group_by(natlangs) %>% count() %>% arrange(desc(n)) %>% 
-  ggplot(aes(x=natlangs, y=n))+
+  ggplot(aes(x=reorder(natlangs, -n), y=n))+
   geom_bar(stat='identity', fill="navyblue")+
   geom_text(aes(label=n), vjust=-0.3, size=4) +
   theme_gyongyver()+
@@ -578,22 +607,42 @@ df %>%  group_by(natlangs) %>% count() %>% arrange(desc(n)) %>%
 
 ```
 
-```{r echo=FALSE, fig.cap="Binned, message=TRUE, warning=TRUE}
+```{r Boxplot, echo=FALSE, fig.cap="Boxplot of English correctness", fig.height=3, fig.width=7, message=FALSE, warning=FALSE, fig.pos="H"}
+ggplot(df,aes(x=natlangs, y=correct))+
+  geom_boxplot(fill="steelblue4", color="black")+
+  geom_violin(width=2, alpha=0.1, fill="skyblue2")+
+  theme_gyongyver()+
+  theme(axis.text.x = element_text(size = 9))+
+  labs(
+    title = "Boxplot of English correctness for native languages",
+    x="",
+    y= "English correctness"
+  )+
+  scale_y_continuous(labels = scales::percent)
+
+```
+
+
+
+```{r binnedscatter, echo=FALSE, fig.cap="Binned scatterplot", message=TRUE, warning=TRUE}
 
 ggarrange(bs1)
 
 ```
 
-```{r echo=FALSE, fig.cap="Smoothed pattern", message=FALSE, warning=FALSE}
+```{r startagepattern, echo=FALSE, fig.cap="Smoothed pattern of age at starting of English learning", message=FALSE, warning=FALSE}
 # Smoothed pattern in appendix
 f1
 
-f2
+```
 
+```{r agepattern, echo=FALSE, warning=FALSE, fig.cap="Smoothed pattern of age"}
+f2
 ```
 
 
 \newpage
+
 ## Bibliography
 
 Hartshorne, J. K., Tenenbaum, J. B., & Pinker, S. (2018). A critical period for second language acquisition: Evidence from 2/3 million English speakers. Cognition, 177, 263-277.
